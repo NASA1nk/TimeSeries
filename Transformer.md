@@ -90,8 +90,16 @@ Softmax(XX^T)X\\
 =\left[\begin{matrix}1&1.76&1&1.91&1\end{matrix}\right]
 $$
 
+所以就是通过训练来找到一个加权，因此最少需要给每个input定义一个tensor
+
+- 但一个tensor，关系之间就是对偶的，并且只有一个tensor，无法存放计算的结果
+- 所以至少给每个input定义2个tensor，Q和K
+  - Q是自己用的，用Q去找自己和别人的关系
+  - K是给别人用的，用K去处理别人的Q
+- 两个tensor也不够，找到了关系并没有使用，还要对input进行加权。和input直接加权比较生硬，所以再给每个input定义一个tensor，V
+  - V也是对input做变换得到的，所以等于对input又加了一层可以学习的参数，使得网络具有更强的学习能力
+
 > 通过query和key的相似性程度来确定value的权重分布的方法被称为scaled dot-product attention
->
 
 ## QKV模型
 
@@ -102,6 +110,12 @@ K = W^kX\\
 V = W^vX
 $$
 不直接使用矩阵X来进行计算而对它进行线性变换是为了提高模型的拟合能力，因为**W矩阵是可以通过训练优化的**
+
+> Q，K，V思想最早来自于Memory Networks
+>
+> Memory Networks是一种思路：使用外部的一个memory来存储**长期记忆**信息。因为当时RNN系列的模型使用final state存储的信息，序列过长就会遗忘到早期信息
+
+
 
 ## 缩放因子
 
@@ -121,6 +135,8 @@ $\sqrt{d_k}$
 
 Positional Encoding是transformer的特有机制，弥补了Attention机制无法捕捉sequence中token位置信息的缺点
 
+位置信息编码位于encoder和decoder的embedding之后，block之前
+
 - 为每个位置的输入都设定一个独立的**位置向量**ei
 - 将位置向量加到输入向量上
 
@@ -132,12 +148,79 @@ Q_i = W_i^qX\\
 K_i = W_i^kX\\
 V_i = W_i^vX
 $$
-通过权重矩阵$W_i^{q,k,v}$将Q，K，V分割，因为$W_i^{q,k,v}$各不相同，所以计算的Qi，Ki，Vi也都不相同，即 ：**每个头关注的重点不一样**
+通过权重矩阵$W_i^{q,k,v}$将Q，K，V分割，因为$W_i^{q,k,v}$各不相同，所以计算的Qi，Ki，Vi也都不相同
 
-> Attention是将query和key映射到**同一高维空间中去计算相似度**，而对应的multi-head attention把query和key映射到高维空间α的不同子空间（α1，α2，α3...）取计算相似度
+- 即 **每个头关注的重点不一样**
+
+Attention是将query和key映射到**同一高维空间中去计算相似度**
+
+- Multi-head Attention把query和key映射到**高维空间α的不同子空间**（α1，α2，α3...）取计算相似度，最后再将各个方面的信息综合起来
+
+> 类比CNN中同时使用**多个卷积核**的作用，直观上讲，多头注意力**有助于网络捕捉到更丰富的特征/信息**
+
+# Mask Muti-Head attention
+
+mask 表示掩蔽，它对某些值进行掩盖，使**其在参数更新时不产生效果**
+
+Transformer模型里面涉及两种mask，分别是padding mask和sequence mask
+
+- padding mask在所有的scaled dot-product attention里面都用到
+- sequence mask只有在decoder的self-attention里面用到
+
+## padding mask
+
+因为**每个批次输入序列长度是不一样的**也就是说，**要对输入序列进行对齐**
+
+- 如果输入的序列太短，给较短的序列后面**填充0**
+- 如果输入的序列太长，截取左边的内容，**把多余的直接舍弃**
+
+因为这些填充的位置其实是没什么意义的，所以attention机制不应该把注意力放在这些位置上，所以需要进行一些处理。具体的做法
+
+- 把这些位置的值加上一个非常大的负数（负无穷），这样经过softmax，这些位置的概率就会接近0
+
+- **padding mask实际上是一个张量**，每个值都是一个Boolean，值为 false的地方就是要进行处理的地方
+
+## sequence mask
+
+sequence mask 是为了使得decoder不能看见未来的信息
+
+- 对于一个序列，在time_step为t的时刻，decoder的输出应该只能依赖于t时刻之前的输出，而不能依赖t之后的输出
+
+**实际运算**
+
+- 产生一个上三角矩阵，上三角的值全为0
+- 把这个矩阵作用在每一个序列上，就可以达到目的
+
+
 
 # Feed Forward NN
 
 前馈神经网络/全连接神经网络
 
 - FNN为encoder引入**非线性变换**（ReLU激活函数），变化了attention的输出空间，增强了模型的拟合能力
+
+# Residual Network
+
+残差网络是深度学习中一个重要概念
+
+在**神经网络可以收敛的前提下**，随着网络深度的增加，网络表现先是逐渐增加至饱和，然后迅速下降，这就是经常讨论的**网络退化**问题
+
+- 在Transformer模型中，encoder和decoder各有6层，为了使当模型中的层数较深时仍然能得到较好的训练效果，模型中引入了残差网络
+
+- 残差连接可以使得网络只关注到当前差异的部分
+
+
+
+# Linear & Softmax
+
+Decoder的输出会经过一个线性变换和softmax层
+
+- Decoder最后的输出是一个实数向量。需要把浮点数对应成一个单词，这便是线性变换层的目的
+
+**线性变换层是一个简单的全连接神经网络**
+
+- 它可以**把Decoder产生的向量映射到一个比它大得多的、被称作对数几率（logits）的向量里**
+- 假设模型从训练集中学习一万个不同的英语单词（即模型的输出词表），则对数几率向量为一万个单元格长度的向量
+- 每个单元格对应某一个单词的分数，就相当于**做vocaburary_size大小的分类**
+- 接下来的Softmax层便会把那些分数变成概率。**概率最高的单元格被选中，并且它对应的单词被作为这个时间步的输出**
+
