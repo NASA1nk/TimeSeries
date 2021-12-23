@@ -148,12 +148,28 @@ Layer Norm是**每一次将一行向量（一个样本）在一个batch中，均
 
 ### Scaled Dot-Product Attention
 
-Transformer使用的是Scaled Dot-Product Attention（最简单的注意力机制），使用内积做计算，**内积值越大，相似度越高**
+Transformer使用的是**Scaled** Dot-Product Attention（最简单的注意力机制），使用内积做计算，**内积值越大，相似度越高**
 
-- query向量和key向量都是等长的，等于dk
+$Q_{n×d_k}$，$K_{m×d_k}$，$Q×K = A_{n×m}$，$V_{m×d_v}$，$A×V = A'_{n×d_v}$
+
+- query向量和key-value向量对的个数可能是不一样的，
+- query向量和key向量长度都是相同的，等于dk
 - value向量的长度是dv，即输出长度也是dv
 
 Layer Norm后向量的维度等会$\sqrt{d_k}$，所以除以$\sqrt{d_k}$
+
+- 当$d_k$不是很大的时候，无所谓
+- 当$d_k$很大（512）的时候，即两个向量比较长的时候，点积的结果值就会比较大（或者比较小）
+  - 当点积值比较大的时候，相对的差距就会变大，则最大的哪个值在softmax后就会更接近于1，剩下的值就会更加接近于0
+- 这时候算梯度就会非常的小，跑不动
+
+> 因为softmax的最后结果是希望预测值，置信的地方尽量靠近1，不置信的地方尽量靠近0，这样就差不多收敛
+
+$A'_{n×d_v}$的每一行就是所需要的输出
+
+- 然后对结果的每一行做softmax，每一行之间是独立的
+
+
 
 
 
