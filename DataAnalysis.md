@@ -610,6 +610,10 @@ df.iat[1,0]
 ```python
 # 只显示存在缺失值的行列
 df[df.isnull().values==True]
+
+# 判断某一列是否全部为空
+for col in range(df.shape[1]):
+    print(df.iloc[col].isnull().all())
 ```
 
 ### 删除缺失值
@@ -1049,58 +1053,112 @@ L2 = np.random.randn(3, 3)
 
 `import matplotlib.pyplot as plt`
 
-## pyplot
+在python环境下进行Matlab风格的绘图
 
-`import matplotlib.pyplot as plt`
+> Mat plot lib
 
-### scatter()
+## 图片和子图
 
-用于绘制散点图
+Matplotlib绘制的图片位于`Figure`（图片）对象中
+
+- 但不能直接在空白的图片上绘图
+- 要创建一个或多个子图，然后在子图上绘图
+- 一个`Figure`对象可以包含多个`Axes`（子图）对象
+  - 以数组的形式创建，调用
+
+> figure可以看成一张画布，axes代表的则是画布中的一片区域
+
+`plt.figure(figsize, dpi)`：创建图片并设置图片的大小等属性，返回一张图片
+
+- `figsize`：传入一个元组`(width, height)`，设置图片的大小
+- `dpi`：传入一个整数值，设置图片的清晰度
+
+```python
+import matplotlib.pyplot as plt
+
+# 生成新的空白的图片
+plt.figure(figsize=(20, 10), dpi=100)
+
+# 添加一个子图,(2,2,2)的前2个表示2*2，将图片划分4块字符，最后一个2表示第二个子图
+axexs = fig.add_subplot(2,2,2)
+
+# 直接创建一个包含子图的图片，返回包含子图对象的numpy数组
+fig, axes = plt.subplots(1, 1, figsize=(8, 4))
+```
+
+## %matplotlib
+
+IPython的内置**magic函数**
+
+magic函数分两种
+
+- 一种是面向**行**的：用前缀`%`标注
+- 一种是面向**单元型**的：用前缀`%%`标注
+
+调用`matplotlib.pyplot`的绘图函数`plot()`进行绘图或者生成一个figure画布的时候，可以直接在python console里面生成图像
+
+- 内嵌绘图，省略掉`plt.show()`这一步
+
+## 散点图
+
+`scatter()`
 
 `matplotlib.pyplot.scatter(x, y, s=None, c=None, marker=None, cmap=None, norm=None, vmin=None,` 
 `vmax=None, alpha=None, linewidths=None, verts=None, edgecolors=None, hold=None, data=None, **kwargs)`
 
-- **x, y** → 散点的坐标（长度相同）
-- **s** → 散点的面积（点的大小）
-- **c** → 散点的颜色（默认值为蓝色`'b'`，其余颜色同`plt.plot( )`）
-- **marker** → 散点样式（默认值为实心圆`'o'`，其余样式同`plt.plot( )`）
-- **alpha** → 散点透明度（[0, 1]之间的数，0表示完全透明，1则表示完全不透明）
-- **linewidths** →散点的边缘线宽
-- **edgecolors** → 散点的边缘颜色
+- `x和y`：**散点的坐标，长度相同**
+- `s`：散点的面积（大小）
+- `c`：散点的颜色，默认值为蓝色`'b'`，其余颜色同`plt.plot()`
+- `marker`：散点的样式，默认值为实心圆`'o'`，其余样式同`plt.plot()`
+- `alpha`：散点的透明度，指为[0, 1]之间的数，0表示完全透明，1表示完全不透明
+- `linewidths`：散点的边缘线宽
+- `edgecolors`：散点的边缘颜色
+- `data`：也可以直接传入数据画图
 
-### plot()
+## 折线图
 
-绘制点和线，并且对其样式进行控制
+`plot()`
 
-### legend()
+
+
+
+
+## 画图
+
+- `plt.plot()`：先生成一个fig对象，然后在这个画布上隐式生成的画图区域（ax对象）上画图
+- `ax.plot()`：同时生成了fig和ax对象，然后用ax对象在其区域上画图，**推荐使用**
+
+## 保存图片
+
+`plt.savefig(filename,dpi,format,bbox_inches)`：对figure对象使用`savefig()`方法
+
+- `filename`：存储的文件名
+- `dpi`：每英寸点数的分辨率
+- `format`：文件格式
+- `bbox_inches`：要保存的图片范围，
+- `tight`参数可以消除图片周围的空白部分，坐标轴也会被消除
+
+> 文件类型可以从文件名中推断出来
+
+```python
+plt.savefig('car.pdf', format='pdf')
+plt.savefig('score.png',bbox_inches='tight')
+```
 
 
 
 ### xticks()
 
-`xticks(rotation)：更改绘制x轴标签方向（与水平方向的逆时针夹角度数）
+`xticks(rotation)`：更改绘制x轴标签方向（与水平方向的逆时针夹角度数）
 
-> 在`matplotlib`中`ticks`表示的是刻度
->
-> **刻度**
->
-> - 刻标（locs）
-> - 刻度标签（tick labels）
->
-> 作图时x轴y轴都是连续的，所以刻标可以随意指定，而刻度标签则可以对应替换
+在`matplotlib`中`ticks`表示的是刻度
+
+**刻度**
+
+- 刻标（locs）
+- 刻度标签（tick labels）
+
+作图时x轴y轴都是连续的，所以刻标可以随意指定，而刻度标签则可以对应替换
 
 
-
-## %matplotlib
-
-Magic Functions	
-
-> IPython的内置magic函数
-
-magic函数分两种
-
-- 一种是面向行的：用前缀`%`标注
-- 一种是面向单元型的：用前缀`%%`标注
-
-调用matplotlib.pyplot的绘图函数`plot()`进行绘图\或者生成一个figure画布的时候，可以直接在python console里面生成图像（内嵌绘图，省略掉`plt.show()`这一步）
 
