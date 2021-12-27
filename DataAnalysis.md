@@ -435,11 +435,11 @@ data = {'Name':['Tom', 'Jack', 'Steve', 'Ricky'],'Age':[28,34,29,42]}
 df = pd.DataFrame(data)
 ```
 
-##  读取数据
+##  查看数据
 
-`head()`：读取df的前五行数据
+- `head()`：读取df的前五行数据
 
-`tail()`：读取df的后五行数据
+- `tail()`：读取df的后五行数据
 
 ## 数据选取
 
@@ -868,6 +868,31 @@ pd.read_csv('girl.csv',na_values={"name": ["古明地觉", "博丽灵梦"], "res
 from datetime import datetime
 pd.read_csv('girl.csv', parse_dates=["date"], date_parser=lambda x: datetime.strptime(x, "%Y年%m月%d日"))
 ```
+
+## 存储数据
+
+`data.to_csv(filename,sep,mode,na_rep,float_format,header,index)`
+
+- `filename`：默认当前的相对路径
+- `sep`：分隔符，默认逗号
+- `mode`：写入模式，默认为`w`，追加写入是`a`
+- `na_rep`：`'NA'`将空值保存为NA
+- `float_format`：`'%.2f'`保留2位小数
+- `header`：`0`表示不保留列索引
+- `index`：`0`表示不保留行索引
+
+> `to_csv()`是`DataFrame`类的方法，`read_csv()`是pandas的方法
+
+```python
+import pandas as pd
+
+list = [1,2,3,4,5]
+data = pd.DataFrame(list)
+# 保留小数点后2位数字
+data.to_csv('std2.csv',float_format='%.2f')
+```
+
+
 
 # Numpy
 
