@@ -37,13 +37,15 @@ CNN的优点是可以有多个输出通道，每个输出可以看成识别的�
 
 ## Encoder-Decoder
 
-编码器-解码器架构
+**编码器-解码器架构**
 
-- encoder将原始的输入表示为机器学习可以理解的一组向量
+- Encoder将原始的输入表示为机器学习可以理解的一组向量
   - 将input序列x=(x1,x2,x3,x4,...,xn)映射成一组向量序列z=(z1,z2,z3,z4,...,zn)
-- decoder根据向量序列z=(z1,z2,z3,z4,...,zn)生成y=(y1,y2,y3,y4,...,ym)
+- Decoder根据向量序列z=(z1,z2,z3,z4,...,zn)生成y=(y1,y2,y3,y4,...,ym)
   - 自回归一个个生成yi
   - 过去时刻的输出也会当成当前时刻的输入 
+
+![Transformer架构](Attention is all you need.assets/Transformer架构.png)
 
 ## Encoder
 
@@ -280,11 +282,12 @@ $$
 
 输入是一个个token，需要将其映射成一个向量
 
-- Embeddings就是给任意一个token，**学习将一个长为d=512的向量来表示它**
-
-
-
-
+- Embedding就是给任意一个token，**学习将一个长为d=512的向量来表示它**
+- 编码器和解码器的输入都要经过一个Embedding，softmax前面也需要一个Embedding
+  - 并且这三个Embedding的权重是一样的，方便训练
+- 权重还会乘以一个$\sqrt{d}$，即$\sqrt{512}$
+  - 因为在学习Embedding的时候可能会将一个向量的L2L学成一个相对比较小的值，比如1，即不管维度多大，最后值都等于1
+  - 维度一大，权重值就会变小，但是Embedding后还需要加上Positional Encoding的向量，所以将权重乘以$\sqrt{d}$后使得两者的维度差不多
 
 ## Positional Encoding
 
@@ -306,3 +309,28 @@ attention是不会有时序信息的
 
 - 因为Positional Encoding的函数是一个cos和sin的函数，所以它的值是在-1和+1之间抖动的
 - 所以将结果乘以一个$\sqrt{d}$，所以每个位置数字也差不多在-1和+1之间抖动
+
+# 优点
+
+- 计算复杂度
+- 顺序的计算：越少越好，越少并行度越高
+- 信息从一个数据点走到另一个数据点要走多远：越短越好
+
+> n个维度为d的query
+>
+> - n：序列长度
+> - d：向量长度
+
+Self-Attention (restricted) 
+
+- query只和最近的r个key做计算
+- 距离比较远的两个点需要走几步才能过来
+
+![比较](Attention is all you need.assets/比较.png)
+
+没有太多东西可以调参
+
+- $N$是多少层
+- $d_{model}$是token表示成的向量的长度
+- $h$是指有多少个头
+
