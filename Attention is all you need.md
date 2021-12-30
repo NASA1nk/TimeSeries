@@ -35,7 +35,7 @@ CNN的优点是可以有多个输出通道，每个输出可以看成识别的�
 
 # 方法
 
-## encoder-decoder
+## Encoder-Decoder
 
 编码器-解码器架构
 
@@ -49,7 +49,7 @@ CNN的优点是可以有多个输出通道，每个输出可以看成识别的�
 
 6 layers：2sub-layers
 
-- multi-attention
+- Multi-Head Attention
 - MLP：positionwise fully connected feed-forward network
 
 `LayerNorm(x+Sublayer(x))`
@@ -124,7 +124,7 @@ Layer Norm是**每一次将一行向量（一个样本）在一个batch中，均
 
 6 layers：3sub-layers
 
-- multi-attention
+- Multi-Head Attention
 - MLP：positionwise fully connected feed-forward network
 - **masked multi-attention**
 
@@ -156,11 +156,13 @@ $Q_{n×d_k}$，$K_{m×d_k}$，$Q×K = A_{n×m}$，$V_{m×d_v}$，$A×V = A'_{n×
 - query向量和key向量长度都是相同的，等于dk
 - value向量的长度是dv，即输出长度也是dv
 
+**缩放因子**
+
 Layer Norm后向量的维度等会$\sqrt{d_k}$，所以除以$\sqrt{d_k}$
 
 - 当$d_k$不是很大的时候，无所谓
 - 当$d_k$很大（512）的时候，即两个向量比较长的时候，点积的结果值就会比较大（或者比较小）
-  - 当点积值比较大的时候，相对的差距就会变大，则最大的哪个值在softmax后就会更接近于1，剩下的值就会更加接近于0
+  - **当点积值比较大的时候，相对的差距就会变大**，则最大的哪个值在softmax后就会更接近于1，剩下的值就会更加接近于0
 - 这时候算梯度就会非常的小，跑不动
 
 > 因为softmax的最后结果是希望预测值，置信的地方尽量靠近1，不置信的地方尽量靠近0，这样就差不多收敛
@@ -169,7 +171,138 @@ $A'_{n×d_v}$的每一行就是所需要的输出
 
 - 然后对结果的每一行做softmax，每一行之间是独立的
 
+![Scaled Dot-Product Attention](Attention is all you need.assets/Scaled Dot-Product Attention.png)
+
+### Msasked
+
+**问题**
+
+- query向量和key向量长度都是相同的，且在时间上是可以对应起来的
+
+- 对于$query_t$，应该只看到$key_1$到$key_{t-1}$部分的内容，而不应该看到$key_t$和之后的内容
+
+- 注意力机制每次都会看到所有的内容，从$key_1$到$key_n$
+
+所以通过一个**带掩码的注意力机制**，来避免**训练的时候**解码器预测第t个时刻的输出的时候看到t时刻后面的内容
+
+- 仍然会全部计算出k1到kn的内容
+- 使用mask操作， 对于t时刻的$query_t$和$key_t$和之后的计算值，换成非常大的负数
+  - 这样在进行softmax归一化时，对应的权重值就会变成0
+- **从而保证训练和预测的行为是一致的**   
+
+
+
+### Multi-Head Attention
+
+与其做一个单个的attention
+
+1. 不如将query向量和key-value向量对投影到一个低维的空间，然后做h次的attention
+   1. layer层就是投影到低维度
+   2. 有几个头就是几次
+2. 然后将h次的attention的输出合并，再投影回高维的空间得到最终输出
+   1. 即将h个头的输出合并
+   2. concat层就是最后的投影
+
+**目的**
+
+- Dot-Product Attention没有什么可以学的参数，具体函数就是内积
+- 有时候为了识别不一样的模式，希望有一些不一样的计算方法
+- **所以先让query向量和key-value向量对投影到一个低维的空间，这个对应的线性变换的W矩阵是可以学的**
+- **给了h次机会（h个头），希望能学到不一样的投影的方法，使得在投影进去的那个度量空间中能匹配不同的模式** 
+
+![Multi-Head Attention](Attention is all you need.assets/Multi-Head Attention.png)
+
+### Self-Attention
+
+输入的query向量和key-value向量对其实是一个东西变换而来，所以叫自注意力机制
+
+> 对应架构图中input embedding进过position encoding后变成三个输入
+
+### Encoder-Decoder传递Attention
+
+连接的attention层不再是自注意力层
+
+- 编码器Encoder的输出作为key向量和value向量传入解码器Decoder中
+- 解码器Decoder的masked attention的输出作为query向量和编码器Encoder的输入key向量和value向量一起作为输入
+
+由于attention层的输出结果是value向量的加权后，所以连接的attention层的输出就是编码器传入的value向量的加权和
+
+- 权重就由解码器的query向量和编码器的key向量得出
+- 即取决于解码器的query向量和编码器的key向量的相似度
+
+> 根据解码器的不一样，会在当前编码器输出的中挑选相似的东西
+
+![连接attention层](Attention is all you need.assets/连接attention层.png)
+
+## Feed Forward NetWorks
+
+**Position-wise Feed-Forward Networks**
+
+- a fully connected feed-forward network
+- 编码器和解码器的每一层都含有一个FNN
+
+**Position-wise**
+
+- attention层输出是一个序列，其中每一个向量就是一个position，将这个相同的MLP对每一个向量作用一次
+
+$$
+FFN = max(0,xW_1+b_1)W_2+b_2
+$$
+
+其中
+
+- $xW_1+b_1$是一个线性层
+- $max(0,xW_1+b_1)$是一个ReLU激活层
+- $max(0,xW_1+b_1)W_2+b_2$是另一个线性层
+
+因为attention层的每一个输出都是一个512的向量
+
+- 所以$x$就是一个512维的向量
+
+- 然后$W_1$会将$x$投影成一个2048维度的向量
+- 由于有残差连接，所以最后还需要有$W_2$去将2048维度的向量投影回512维度
+
+**就是一个单隐藏层的MLP，中间的隐藏层将输入扩大4倍，最后的输出层再缩小回去**
+
+- 
+
+因为在经过attention层处理后，每一个输出的向量已经抓取出序列中所想要的信息了
+
+- **所以在经过MLP做投影的时候，因为每一个向量已经包含所需的信息，每个MLP只要在对每个单独的向量独立做运算就可以了**
+
+> 做空间转换
+
+**RNN和Transformer区别**
+
+![RNN和Transformer区别](Attention is all you need.assets/RNN和Transformer区别.png)
+
+## Embeddings and Softmax
+
+输入是一个个token，需要将其映射成一个向量
+
+- Embeddings就是给任意一个token，**学习将一个长为d=512的向量来表示它**
 
 
 
 
+
+## Positional Encoding
+
+attention是不会有时序信息的
+
+- 输出是value向量的加权和，权重是query向量和key向量的距离（相似度），都与序列位置信息无关
+- 所以给定一个序列，将其中的向量位置打乱，得出的结果顺序会变，但是值是不会变的
+
+> RNN本身就是一个时序的处理，将上一个时刻的输入作为下一个时刻的输出
+
+因为输入序列无论怎么打乱顺序，输出值是一样的，所以选择**在输入值里面直接加入时序信息的值**
+
+- attention的输入是在嵌入层表示的一个d=512长度的一个向量
+- 所以现在依旧使用一个d=512长度的一个向量来表示一个数字，**代表向量的位置**
+
+> 因为计算机一个数字可以认为是一个**长度为32位的向量**来表示的
+
+将**这两个向量相加就表示加入了时序数据的输入**
+
+- 因为Positional Encoding的函数是一个cos和sin的函数，所以它的值是在-1和+1之间抖动的
+- 所以将结果乘以一个$\sqrt{d}$，所以每个位置数字也差不多在-1和+1之间抖动
