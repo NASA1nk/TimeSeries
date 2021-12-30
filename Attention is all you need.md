@@ -1,3 +1,5 @@
+李沐-Transformer论文逐段精读
+
 # 引言
 
 传统的seq2seq依赖使用encoder-decoder结构的RNN,CNN，在encoder-decoder之间会使用注意力机制
