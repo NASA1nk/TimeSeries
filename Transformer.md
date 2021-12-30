@@ -165,7 +165,7 @@ mask 表示掩蔽，它对某些值进行掩盖，使**其在参数更新时不�
 Transformer模型里面涉及两种mask，分别是padding mask和sequence mask
 
 - padding mask在所有的scaled dot-product attention里面都用到
-- sequence mask只有在decoder的self-attention里面用到
+- sequence mask只有在**decoder**的self-attention里面用到
 
 ## padding mask
 
