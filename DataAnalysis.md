@@ -659,19 +659,23 @@ for col in range(df.shape[1]):
 
 ## 读取csv文件
 
+`read_csv()`
+
 - 文件读取时设置某些列为时间类型
 - 导入文件, 含有重复列
 - 过滤某些列
 - 每次迭代指定的行数
 - 值替换
 
-### 参数
+### 指定文件
 
-`read_csv()`
+`filepath_or_buffer: Union[str, pathlib.Path, IO[~AnyStr]]`
 
 - 文件路径
 - url（返回一个文件）
 - 文件对象
+- 数据字符串（即CSV中的数据字符以字符串形式直接传入）
+- 字节数据
 
 ```python
 import pandas as pd
@@ -685,9 +689,14 @@ pd.read_csv(f)
 
 ### 分隔符
 
-`sep`：读取csv文件时指定的分隔符，默认为逗号
+`sep`
 
-`delimiter`：
+- 读取csv文件时指定的分隔符，**默认为逗号**
+
+`delimiter`
+
+- 定界符，备选分隔符，是`sep`的别名，效果和sep一样
+- 如果指定该参数，则`sep`参数失效
 
 > csv文件的分隔符和读取csv文件时指定的分隔符要一致
 >
@@ -700,11 +709,11 @@ pd.read_csv('girl.csv', sep='\t')
 ### 表头列名
 
 - `header`
-  - 导入DataFrame的每一列的名称，默认为`infer`
+  - 导入DataFrame的每一列的名称，默认为`header = infer`
 - `names`
   - 当`names`没有被赋值时，
-    - `header`没被赋值时，`header=0`，使用**数据文件的第一行**作为列名称
-    - `header`被赋值时，指定数据做表头，下面为数据
+    - `header`没被赋值时，`header=0`，**使用数据文件的第一行作为列名称**
+    - `header`被赋值时，**指定数据做表头，下面为数据**
   - 当`names`被赋值时
     - `header`没被赋值时，`header=0`
     - `header`被赋值时，先由`header`指定表头和数据，再由`names`指定的数据替换表头
@@ -743,21 +752,19 @@ pd.read_csv('girl.csv', header=None, prefix="女生")
 
 `index_col`
 
-读取文件后得到的DataFrame的索引默认是0、1、2...可以在读取的时候指定某列为索引
-
-> 也可以通过`set_index`设定索引
->
-> 也可以指定多列作为索引`["id", "name"]`
+- 读取文件后得到的DataFrame的索引默认是0、1、2...可以在读取的时候**指定某列为索引**
+- 也可以通过`set_index`设定索引
+- 可以指定多列作为索引`["id", "name"]`
 
 ```python
 pd.read_csv('girl.csv', index_col="name")
 ```
 
-### 指定读取列
+### 读取指定列
 
 `usecols`
 
-读取文件的时候指定要使用到的列
+- 读取文件的时候指定要使用到的列
 
 ```python
 pd.read_csv('girl.csv', usecols=["name", "address"])
@@ -767,7 +774,7 @@ pd.read_csv('girl.csv', usecols=["name", "address"])
 
 `dtype`
 
-读取数据时设置字段的类型
+- 读取数据时设置字段的类型
 
 > DataFrame的每一列都是有类型的，在读取csv的时候，pandas会根据数据来判断每一列的类型
 
@@ -779,7 +786,7 @@ df = pd.read_csv('girl.csv', dtype={"id": str})
 
 `converters`
 
-在读取数据的时候对列数据进行转换处理
+- 在读取数据的时候对列数据进行转换处理
 
 > 在使用converters参数时解析器默认所有列的类型为`str`，所以需要进行类型转换
 
@@ -787,31 +794,30 @@ df = pd.read_csv('girl.csv', dtype={"id": str})
 pd.read_csv('girl.csv', converters={"id": lambda x: int(x) + 10})
 ```
 
+指定哪些值应该被清洗为True，哪些值被清洗为False
+
 - `true_values`
 - `false_value`
-
-指定哪些值应该被清洗为True，哪些值被清洗为False
 
 > 替换规则：只有当某一列的数据类别全部出现在`true_values`和` false_values`里面，才会被替换（即当某一列的值包含对和错，才会被替换）
 
 ```python
 # 对 转换为True,错 转换为False
 pd.read_csv('girl.csv', true_values=["对"], false_values=["错"])
+
 # 对和错 全部转换为False
 pd.read_csv('girl.csv', sep="\t",  false_values=["错", "对"]
+            
 # 不会被替换，因为还有 对 没有被指定
 pd.read_csv('girl.csv', sep="\t", false_values=["错"])
 ```
-
-
 
 ### 过滤行
 
 `skiprows`
 
-将要过滤的行数传递给`skiprows`
-
-> 先过滤，再确定表头
+- 指定要过滤的行数
+- 先过滤，再确定表头
 
 ```python
 pd.read_csv('girl.csv', skiprows=[0])
@@ -826,7 +832,7 @@ pd.read_csv('girl.csv', skiprows=lambda x: x > 0 and x % 2 == 0)
 
 `nrows`
 
-设置一次性读入的数据文件的行数
+- 设置一次性读入的数据文件的行数
 
 ```python
 pd.read_csv('girl.csv', nrows=1)
@@ -838,9 +844,8 @@ pd.read_csv('girl.csv', nrows=1)
 
 `na_values`
 
-指定哪些值应该被处理成`NaN`
-
-> 不同的列中包含了不同的值，可以一起处理
+- 指定哪些值应该被处理成`NaN`
+- 不同的列中包含了不同的值，可以一起处理
 
 ```text
 pd.read_csv('girl.csv', na_values=["对", "古明地觉"])
