@@ -741,16 +741,22 @@ tensor([[0., -inf, -inf,  ..., -inf, -inf, -inf],
         [0., 0., 0.,  ..., 0., 0., 0.]])
 ```
 
-## forward
+# forward
+
+## PE广播
 
 **输入x(100,20,1)先传播到位置编码的forward中**
+
+- x(S,N,E)，S是source sequence length，N是batch size，E是feature number，即(sequence_len,batch_size,d_model)
+- pe(5000,1,250)，5000是序列最大长度，250是d_model，单个数据表示成d_model长度的向量
+- 所以**取x.size(0)=100对pe进行划分，得到(100,1,250)的位置数据**，加到in上
 
 ```python
 # x.size(0) = 100，即input_window
 return x + self.pe[:x.size(0), :]
 ```
 
-pe是一个(5000,1,250)的数据，所以**取x.size(0)=100对pe进行划分，得到(100,1,250)的位置数据**，加到in上
+
 
 因为形状不一样，会触发**广播**特性
 
@@ -824,7 +830,11 @@ tensor([[[-0.5161,  0.4839, -0.5161,  ...,  0.4839, -0.5161,  0.4839],
        device='cuda:0')
 ```
 
+## Encoder
+
 再进入encoder中
+
+encoder是一个
 
 - **输出结果依旧是一个(100,20,250)的数据**
 

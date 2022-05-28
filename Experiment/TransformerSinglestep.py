@@ -57,7 +57,7 @@ class PositionalEncoding(nn.Module):
 
         # pytorch一般情况下将网络中的参数保存成OrderedDict形式
         # 网络参数包括2种，一种是模型中各种module含的参数，即nn.Parameter，也可以在网络中定义其他的nn.Parameter参数，另外一种是buffer
-        # nn.Parameter会在每次optim.step会得到更新，buffer则不会被更新，buffer的更新在forward中
+        # nn.Parameter会在每次optim.step会得到更新（即梯度更新），buffer则不会被更新（不会有梯度传播给它），但是能被模型的state_dict记录下来，buffer的更新在forward中
 
         # 将pe存到内存中的一个常量(映射)，模型保存和加载的时候可以写入和读出，可以在forward()中使用
         self.register_buffer('pe', pe)
