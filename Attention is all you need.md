@@ -30,6 +30,16 @@
 
 - 多头也可以识别不同的模式
 
+#### CNN并行计算
+
+比如有4和元素（a1,a2,a3,a4），输入第一层卷积层有两个filter，每个1D filter的size是2，到了第二层的卷积层，filter的size是3
+
+- 第一层的filter考虑的是两个元素之间的关联，到了第二层，考虑了三个前一层输出的交互，从而考虑到了较长序列之间的关系
+
+- 所以第一层，考虑了（a1,a2），(a2,a3)，（a3,a4）得到b1，b2，b3，第二层就会考虑（b1,b2,b3），即第二层考虑了（a1,a2,a3,a4）
+
+**问题**：CNN一般每次卷积核设的长度为3/5这种较小的值，对于序列长度较长的，比如512，就需要堆叠多层的卷积层，导致模型过于冗杂
+
 ### memory networks
 
 ## 方法
@@ -89,6 +99,8 @@ Layer Norm是**每一次将一行向量（一个样本）在一个batch中，均
 - **不需要全局的均值和方差，因为计算是针对每一个样本的**
 
 > 可以认为是**将向量转置后使用Batch Norm然后变换后再转置回来就得到结果**
+
+![Norm](Attention is all you need.assets/Norm.png)
 
 #### 三维数据
 
@@ -201,7 +213,6 @@ $A'_{n×d_v}$的每一行就是所需要的输出
 - **从而保证训练和预测的行为是一致的**   
 
 > 将$QK^T$的**上三角元素标为负无穷大**
->
 
 #### Multi-Head Attention
 
@@ -240,7 +251,7 @@ $A'_{n×d_v}$的每一行就是所需要的输出
 
 - 权重就由Decoder的query向量和Encoder的key向量得出，即**输出取决于Decoder的query向量和Encoder的key向量的相似度**
 
-> 根据Decoder的query的不同，会在当前Encoder输出的key中挑选相似的东西
+> 根据Decoder的query的不同，会在当前Encoder输出的key和value中挑选相似的东西
 
 ![连接attention层](Attention is all you need.assets/连接attention层.png)
 
@@ -316,6 +327,19 @@ $$
 - 因为Positional Encoding的函数是一个cos和sin的函数，所以它的值是在-1和+1之间抖动的
 - 所以将结果乘以一个$\sqrt{d_{model}}$，所以每个位置数字也差不多在-1和+1之间抖动
 
+> [Self-Attention with Relative Position Representations (arxiv.org)](https://arxiv.org/abs/1803.02155)论文指出，同一个sequence中使用相对位置更好
+
+#### 类别
+
+根据encoding的方式可以分为
+
+- functional encoding：通过特定函数的方式，将输入的位置idx变换为embedding
+- parametric encoding：通过embedding loopup的方式，**让模型自己学习位置的embedding** 
+
+BERT使用的是parametric absolute positional encoding（PAPE），Transformer使用的是functional absolute positional encoding（FAPE）
+
+> 这两种方式的效果都差不多，但是functional的可以减少模型的参数
+
 ## 优点
 
 - 计算复杂度
@@ -353,6 +377,12 @@ Transformer
 - self-attention模块**让源序列和目标序列首先自关联起来**，这样源序列和目标序列**自身的embedding表示所蕴含的信息更加丰富**
 - 后续的FFN层也增强了模型的表达能力
 - Muti-Head Attention模块使得Encoder端拥有并行计算的能力，**Decoder端仍旧需要串行计算**
+
+## 缺点
+
+Tranformer的空间以及时间复杂度非常大
+
+- 长度为L的seq达到了`o(L2)`，因为每一层的self attention都要存储L2的score用于之后的更新，所以L的长度不能很大，否则会遇到OOM的问题
 
 # Transformer计算细节
 
@@ -433,6 +463,8 @@ Softmax(XX^T)X\\
 =\left[\begin{matrix}1&1.76&1&1.91&1\end{matrix}\right]
 $$
 
+![softmax](Attention is all you need.assets/softmax.png)
+
 ### QKV模型
 
 需要**通过训练来找到一个加权**，因此最少需要给每个input定义一个tensor
@@ -457,6 +489,10 @@ $$
 > Q，K，V思想最早来自于Memory Networks
 >
 > Memory Networks是一种思路：使用外部的一个memory来存储**长期记忆**信息，因为当时RNN系列的模型使用final state存储的信息，序列过长就会遗忘到早期信息
+>
+> 如果不使用QKV矩阵，那么每个token对应的q，k，v都是一样的，那么该token对所有的token做dot product的时候，会出现和自身的k出来的结果是最大的，而其他的就不那么大，再经过softmax之后，则导致token只会关注到自身，对于其他的token的attention作用非常小
+
+![QKV](Attention is all you need.assets/QKV.png)
 
 ### 缩放因子
 
@@ -498,7 +534,7 @@ $$
 
 Attention是将query和key映射到**同一高维空间中去计算相似度**，Multi-head Attention把query和key映射到**高维空间α的不同子空间**（α1，α2，α3...）取计算相似度，最后再将各个方面的信息综合起来
 
-> 类比CNN中同时使用**多个卷积核**的作用，直观上讲，多头注意力**有助于网络捕捉到更丰富的特征/信息**
+> 类比CNN中同时使用**多个卷积核**的作用（不同的kernel能过获取的信息不同），直观上讲，多头注意力**有助于网络捕捉到更丰富（各方面）的特征/信息**
 
 ## Mask Muti-Head attention
 
@@ -558,3 +594,128 @@ Decoder的输出会经过一个线性变换和softmax层
 - 每个单元格对应某一个单词的分数，就相当于**做vocaburary size大小的分类**
 - 接下来的Softmax层便会把那些分数变成概率，**概率最高的单元格被选中，并且它对应的单词被作为这个时间步的输出**
 
+## 并行训练
+
+> Decoder的每次timestamp的输入都是之前的前一次的输出，为什么是并行？
+
+- 在训练的时候，把所有的target序列直接作为decoder的输入，然后通过mask作用得到的序列来模拟不同timestamp
+- 在预测的时候，才是真正将decoder的输出作为下一次的输入
+
+```python
+def evaluate(inp_sentence):
+  start_token = [tokenizer_pt.vocab_size]
+
+  end_token = [tokenizer_pt.vocab_size + 1]
+
+  # inp sentence is portuguese, hence adding the start and end token
+  inp_sentence = start_token + tokenizer_pt.encode(inp_sentence) + end_token
+  encoder_input = tf.expand_dims(inp_sentence, 0)
+
+  # as the target is english, the first word to the transformer should be the
+  # english start token.
+  decoder_input = [tokenizer_en.vocab_size] # <start_of_sentence>
+  output = tf.expand_dims(decoder_input, 0)
+
+  for i in range(MAX_LENGTH):
+    print(output)
+    enc_padding_mask, combined_mask, dec_padding_mask = create_masks(
+        encoder_input, output)
+    predictions, attention_weights = transformer(encoder_input,
+                                                 output,
+                                                 False,
+                                                 enc_padding_mask,
+                                                 combined_mask,
+                                                 dec_padding_mask)
+
+    # select the last word from the seq_len dimension
+    predictions = predictions[: ,-1:, :]  # (batch_size, 1, vocab_size)
+
+    predicted_id = tf.cast(tf.argmax(predictions, axis=-1), tf.int32)
+
+    # return the result if the predicted_id is equal to the end token
+    if predicted_id == tokenizer_en.vocab_size+1: # <end_of_sentence>
+      return tf.squeeze(output, axis=0), attention_weights
+
+    # concatentate the predicted_id to the output which is given to the decoder
+    # as its input.
+    output = tf.concat([output, predicted_id], axis=-1)
+
+  return tf.squeeze(output, axis=0), attention_weights
+translate("este é um problema que temos que resolver.")
+print ("Real translation: this is a problem we have to solve .")
+>> tf.Tensor([[8087]], shape=(1, 1), dtype=int32)
+>> tf.Tensor([[8087   16]], shape=(1, 2), dtype=int32)
+>> tf.Tensor([[8087   16   13]], shape=(1, 3), dtype=int32)
+>> tf.Tensor([[8087   16   13    7]], shape=(1, 4), dtype=int32)
+>> tf.Tensor([[8087   16   13    7  328]], shape=(1, 5), dtype=int32)
+>> tf.Tensor([[8087   16   13    7  328   10]], shape=(1, 6), dtype=int32)
+>> tf.Tensor([[8087   16   13    7  328   10   14]], shape=(1, 7), dtype=int32)
+>> tf.Tensor([[8087   16   13    7  328   10   14   24]], shape=(1, 8), dtype=int32)
+>> tf.Tensor([[8087   16   13    7  328   10   14   24    5]], shape=(1, 9), dtype=int32)
+>> tf.Tensor([[8087   16   13    7  328   10   14   24    5  966]], shape=(1, 10), dtype=int32)
+>> tf.Tensor([[8087   16   13    7  328   10   14   24    5  966   19]], shape=(1, 11), dtype=int32)
+>> tf.Tensor([[8087   16   13    7  328   10   14   24    5  966   19    2]], shape=(1, 12), dtype=int32)
+Input: este é um problema que temos que resolver.
+Predicted translation: this is a problem that we have to solve it .
+Real translation: this is a problem we have to solve .
+```
+
+## demo
+
+对单个句子训练时候，输入到 decoder的分别是
+
+```bash
+<bos>
+
+<bos>，“i”
+
+<bos>，“i”，“love”
+
+<bos>，“i”，"love "，“machine”
+
+<bos>，“i”，"love "，“machine”，“learning”
+```
+
+将这些输入组成矩阵进行输入
+
+```bash
+[<bos>
+<bos>，“i”
+<bos>，“i”，“love”
+<bos>，“i”，"love "，“machine”
+<bos>，“i”，"love "，“machine”，“learning”]
+```
+
+将decoder在上述2-6步次的输入补全为一个完整的句子
+
+```bash
+[<bos>，“i”，"love "，“machine”，“learning”
+<bos>，“i”，"love "，“machine”，“learning”
+<bos>，“i”，"love "，“machine”，“learning”
+<bos>，“i”，"love "，“machine”，“learning”
+<bos>，“i”，"love "，“machine”，“learning”]
+```
+
+然后将上述矩阵矩阵乘以一个mask矩阵（下三角矩阵）
+
+```bash
+1 0 0 0 0
+1 1 0 0 0
+1 1 1 0 0
+1 1 1 1 0
+1 1 1 1 1
+```
+
+就得到了
+
+```bash
+[<bos>
+<bos>，“i”
+<bos>，“i”，“love”
+<bos>，“i”，"love "，“machine”
+<bos>，“i”，"love "，“machine”，“learning”]
+```
+
+这个矩阵就类似于批处理，矩阵的每行是一个样本，只是每行的样本长度不一样，每行输入后最终得到一个输出概率分布
+
+**这样在训练时就可以进行并行计算**
