@@ -98,10 +98,10 @@ class TransformerModel(nn.Module):
     # 定义模型，继承nn.Module
     def __init__(self, feature_size=250, num_layers=1, dropout=0.1):
         """
-        编码器Encoder，只有一层encoder层\n
-        encoder层:10个头(默认8个)，dropout=0.1(默认),FNN默认维度2048，激活函数默认是ReLU\n
-        CLASS torch.nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward=2048, dropout=0.1, activation='relu')\n
-        解码器Decoder，使用全连接层代替了Decoder， 可以加一下Transformer的Decoder试试效果
+        编码器Encoder，只有一层encoder层
+        encoder层:10个头(默认8个)，dropout=0.1(默认),FNN默认维度2048，激活函数默认是ReLU
+        torch.nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward=2048, dropout=0.1, activation='relu')
+        解码器Decoder，使用全连接层代替了Decoder， 可以用Transformer的Decoder试试效果
 
         Args:
             feature_size (int, optional): 向量维度，默认d_model=250
@@ -126,7 +126,7 @@ class TransformerModel(nn.Module):
         initrange = 0.1
         # self.encoder.weight.data.uniform_(-initrange,initrange)
 
-        # decoder：nn.Linear，设置bias和weight
+        # decoder：nn.Linear，设置bias和weight（pytorch特性）
         self.decoder.bias.data.zero_()
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
@@ -134,12 +134,14 @@ class TransformerModel(nn.Module):
         # 如果没有指定，就生成一个mask
         if self.src_mask is None or self.src_mask.size(0) != len(src):
             device = src.device
+            # print(f'mask :{src.size()}')
             mask = self._generate_square_subsequent_mask(len(src)).to(device)
             self.src_mask = mask
 
         # 输入数据src在网络中进行前向传播
         # 首先添加位置编码，然后进过Encoder层，然后进入Decoder层，最后输出结果
         src = self.pos_encoder(src)
+        # print(f'j: {src.size()} {self.src_mask.size()}')
         output = self.transformer_encoder(src, self.src_mask)
         output = self.decoder(output)
         return output
@@ -164,8 +166,8 @@ class TransformerModel(nn.Module):
 
 def create_inout_sequences(input_data, tw):
     """
-        处理原始数据集得到模型的训练集，并转换为tensor\n
-        train_sequence = create_inout_sequences(train_data,input_window)\n
+        处理原始数据集得到模型的训练集，并转换为tensor
+        train_sequence = create_inout_sequences(train_data,input_window)
         每次从数据集中取出目标窗口(tw)长度的数据：数据集的(i,i+100)部分是输入，数据集的(i+1,i+100+1)部分是输出，即监督学习的对应的输出(label)\n
         得到训练集:[[[0...100],[1...101]],[[1...101],[2...102]]...]
 
@@ -175,6 +177,7 @@ def create_inout_sequences(input_data, tw):
     """
     inout_seq = []
     L = len(input_data)
+    # print(f'len: {L}')
     for i in range(L-tw):
         train_seq = input_data[i:i+tw]
         train_label = input_data[i+output_window:i+tw+output_window]
@@ -185,8 +188,8 @@ def create_inout_sequences(input_data, tw):
 
 def get_data():
     """
-        导入CSV数据，对数据做归一化处理,提升模型的收敛速度,提升模型的精度\n
-        初始化scaler在(-1,1)之间,然后使用scaler归一化数据，amplitude指序列振幅\n
+        导入CSV数据，对数据做归一化处理,提升模型的收敛速度,提升模型的精度
+        初始化scaler在(-1,1)之间,然后使用scaler归一化数据，amplitude指序列振幅
         根据sampels将数据划分为数据集和测试集，调用create_inout_sequences()将其转换为tensor
     """
 
