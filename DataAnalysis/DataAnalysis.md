@@ -1089,19 +1089,25 @@ L2 = np.random.randn(3, 3)
 
 ## 图片和子图
 
-Matplotlib绘制的图片位于`Figure`（图片）对象中
+Matplotlib绘制的图片位于图片对象`Figure`中
 
 - 但不能直接在空白的图片上绘图
 - 要创建一个或多个子图，然后在子图上绘图
-- 一个`Figure`对象可以包含多个`Axes`（子图）对象
+- 一个`Figure`中可以包含多个子图对象`Axes`
   - 以数组的形式创建，调用
 
-> figure可以看成一张画布，axes代表的则是画布中的一片区域
+> `Figure`可以看成一张画布，`Axes`代表的则是画布中的一片区域
 
 `plt.figure(figsize, dpi)`：创建图片并设置图片的大小等属性，返回一张图片
 
 - `figsize`：传入一个元组`(width, height)`，设置图片的大小
 - `dpi`：传入一个整数值，设置图片的清晰度
+
+`plt.subplots`
+
+- 会返回两个值，一个是fig，一个是ax，然后可以使用 ax对子图进行绘制
+
+- 没有传入参数默认整个绘图区域只会包含一个子区域
 
 ```python
 import matplotlib.pyplot as plt
@@ -1110,11 +1116,15 @@ import matplotlib.pyplot as plt
 plt.figure(figsize=(20, 10), dpi=100)
 
 # 添加一个子图,(2,2,2)的前2个表示2*2，将图片划分4块字符，最后一个2表示第二个子图
-axexs = fig.add_subplot(2,2,2)
+axes = fig.add_subplot(2,2,2)
 
 # 直接创建一个包含子图的图片，返回包含子图对象的numpy数组
 fig, axes = plt.subplots(1, 1, figsize=(8, 4))
 ```
+
+
+
+
 
 ## %matplotlib
 
@@ -1152,11 +1162,6 @@ magic函数分两种
 
 
 
-
-## 画图
-
-- `plt.plot()`：先生成一个fig对象，然后在这个画布上隐式生成的画图区域（ax对象）上画图
-- `ax.plot()`：同时生成了fig和ax对象，然后用ax对象在其区域上画图，**推荐使用**
 
 ## 保存图片
 
