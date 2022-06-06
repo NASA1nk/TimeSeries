@@ -9,6 +9,8 @@ from matplotlib import pyplot
 import torch
 import torch.nn as nn
 from sklearn.preprocessing import MinMaxScaler
+from get_data import get_data, get_batch
+from embed import PositionalEncoding
 
 sys.path.insert(0,os.getcwd())
 
@@ -22,70 +24,8 @@ output_window = 1
 
 batch_size = 20
 
-# 获取device，后续可以调用to(device)把Tensor移动到device上
+# 指定device，后续可以调用to(device)把Tensor移动到device上
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-# 位置编码,得到token的绝对位置信息和相对位置信息
-# 构造一个跟输入embedding维度一样的矩阵,然后跟输入embedding相加得到multi-head attention的输入
-
-# 无学习参数的位置编码
-class PositionalEncoding(nn.Module):
-
-    # d_model表示向量维度，max_len表示最大长度为5000，一般是200
-    def __init__(self, d_model, max_len=5000):
-        super(PositionalEncoding, self).__init__()
-        # zeros()生成二维矩阵pe(5000*250)，len行，d_model列，即5000个维度为250的行向量
-        pe = torch.zeros(max_len, d_model)
-
-        # arrange()生成一维矩阵pos(5000)，即5000个数(维度为5000的一个行向量)
-        # unsqueeze()用于在指定位置增加维度，如(0，1，2)三维，返回的tensor与输入的tensor共享内存，即改变其中一个的内容也会改变另一个
-        # 1即表示在第二个维度处增加，即列方向上增加一个维度，维度为5000的一个行向量变成了5000个维度为1的行向量，pos变成了二维矩阵(5000*1)
-        # pos这5000个一维向量就构成一列，计算位置信息来依次填充pe的每一个奇偶列
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        # 2是arange()中的步长参数，位置编码计算公式 e^(2i*-log10000/d_model)
-        div_term = torch.exp(torch.arange(
-            0, d_model, 2).float() * (-math.log(10000.0) / d_model))
-        # 填充pe矩阵，偶数列正弦编码，奇数列余弦编码
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-
-        # 0表示在第一个维度处增加一个维度，则二维矩阵pe(5000*250)变成了三维矩阵(1*5000*250)
-        # 第一个维度用于接受batch_size参数，表示第几个batch
-        # transpose(0,1)用于对矩阵进行转置，转置0维和1维，将(1*5000*250)变成(5000*1*250)
-        # 即位置编码三维矩阵pe最终是5000个，每个250维的行向量组成
-        pe = pe.unsqueeze(0).transpose(0, 1)
-        # pe.requires_grad = False
-
-        # pytorch一般情况下将网络中的参数保存成OrderedDict形式
-        # 网络参数包括2种，一种是模型中各种module含的参数，即nn.Parameter，也可以在网络中定义其他的nn.Parameter参数，另外一种是buffer
-        # nn.Parameter会在每次optim.step会得到更新（即梯度更新），buffer则不会被更新（不会有梯度传播给它），但是能被模型的state_dict记录下来，buffer的更新在forward中
-
-        # 将pe存到内存中的一个常量(映射)，模型保存和加载的时候可以写入和读出，可以在forward()中使用
-        self.register_buffer('pe', pe)
-
-    def forward(self, x):
-        """
-            前向传播,将embedding后的输入加上position encoding
-            x=(S,N,E),S是source sequence length, N是batch size,E是feature number
-            即(source_sequence_length, batch_size, d_model)
-        """
-
-        return x + self.pe[:x.size(0), :]
-
-
-# 有学习参数的位置编码
-
-# 位置编码的维数是可以优化的超参数
-# class LearnedPositionEncoding(nn.Embedding):
-#     def __init__(self,d_model, dropout = 0.1,max_len = 5000):
-#         super().__init__(max_len, d_model)
-#         self.dropout = nn.Dropout(p = dropout)
-
-#     def forward(self, x):
-#         weight = self.weight.data.unsqueeze(1)
-#         x = x + weight[:x.size(0),:]
-#         return self.dropout(x)
 
 
 # torch.nn.Module是所有NN的基类
@@ -132,19 +72,19 @@ class TransformerModel(nn.Module):
         # 如果没有指定，就生成一个mask
         if self.src_mask is None or self.src_mask.size(0) != len(src):
             device = src.device
-            # print(f'mask :{src.size()}')
             mask = self._generate_square_subsequent_mask(len(src)).to(device)
             self.src_mask = mask
 
         # 输入数据src在网络中进行前向传播
         # 首先添加位置编码，然后进过Encoder层，然后进入Decoder层，最后输出结果
         src = self.pos_encoder(src)
-        # print(f'j: {src.size()} {self.src_mask.size()}')
+        
+        # 在这里添加时间编码
+
         output = self.transformer_encoder(src, self.src_mask)
         output = self.decoder(output)
         return output
 
-    #
 
     def _generate_square_subsequent_mask(self, sz):
         """
@@ -160,88 +100,9 @@ class TransformerModel(nn.Module):
             '-inf')).masked_fill(mask == 1, float(0.0))
         return mask
 
-# 输入input = seq->[0..99],输出target(label)->[1..100]
-
-
-def create_inout_sequences(input_data, tw):
-    """
-        调用：train_sequence = create_inout_sequences(train_data, input_window)
-        处理原始数据集得到模型的训练集，并转换为tensor
-        每次从数据集中取出目标窗口(tw)长度的数据：(i,i+100)部分是输入，(i+1,i+100+1)部分是输出，即监督学习的对应的label
-        最终得到训练集[ ([0-100],[1-101]), ([1-101],[2-102]), ..., ([1899-1999],[1900-2000]) ]，共1900个数据
-
-    Args:
-        input_data: 原始数据，即train_data
-        tw: 输入窗口，即input_window = 100
-    """
-    inout_seq = []
-    L = len(input_data)
-    for i in range(L-tw):
-        train_seq = input_data[i:i+tw]
-        train_label = input_data[i+output_window:i+tw+output_window]
-        inout_seq.append((train_seq, train_label))
-    # 转换成tensor
-    return torch.FloatTensor(inout_seq)
-
-
-def get_data():
-    """
-        导入CSV数据，对数据做归一化处理,提升模型的收敛速度,提升模型的精度
-        初始化scaler在(-1,1)之间,然后使用scaler归一化数据，amplitude指序列振幅
-        根据sampels将数据划分为数据集和测试集，调用create_inout_sequences()将其转换为tensor
-    """
-
-    # header=0，使用数据文件的第一行作为列名称，将第一列作为索引
-    series = read_csv('./Experiment/data/Prometheus/minutedata.csv', header=0,
-                      index_col=0, parse_dates=True, squeeze=True)
-    scaler = MinMaxScaler(feature_range=(-1, 1))
-    # reshape()更改数据的行列数，(-1, 1)将series变为一列 (2203,1)，归一化后再(-1)变为一行 (2203,)
-    amplitude = scaler.fit_transform(series.to_numpy().reshape(-1, 1)).reshape(-1)
-    # 反归一化：reamplitude = scaler.inverse_transform(amplitude.reshape(-1, 1)).reshape(-1)
-    sampels = 2000
-    # (2000,)
-    train_data = amplitude[:sampels]
-    test_data = amplitude[sampels:]
-
-    # view(-1)变成一行
-    # train_tensor = torch.FloatTensor(train_data).view(-1)
-    # test_data = torch.FloatTensor(test_data).view(-1)
-    train_sequence = create_inout_sequences(train_data, input_window)
-    # (1900,2,100)
-    train_sequence = train_sequence[:-output_window]
-    test_data = create_inout_sequences(test_data, input_window)
-    test_data = test_data[:-output_window]
-
-    # 把tensor移动到GPU上运行
-    return train_sequence.to(device), test_data.to(device)
-
-
-def get_batch(source, i, batch_size):
-    """
-        调用：data, targets = get_batch(train_data, i, batch_size)
-        把源数据分为长度为batch_size的块，生成模型训练的输入和输入数据
-    Args:
-        source: 即train_data
-        i: 每组数据从i开始,即当前batch的起始索引
-        batch_size: 10
-    """
-    seq_len = min(batch_size, len(source) - 1 - i)
-    # 每个batch的数据
-    data = source[i:i+seq_len]
-    # torch.stack(inputs, dim=?)→Tensor，对inputs(多个tensor)沿指定维度dim拼接，返回一维的tensor
-    # 即source = [([0...100],[1...101]), ([1...101],[2...102])...]，取出item[0]拼接,即train_seq = [[0...100],[1...101]...]
-    # torch.chunk(tensor, chunk_num, dim)将tensor在指定维度上(0行,1列)分为n块,返回一个tensor list,是一个tuple
-    # 即将拼接后的source按每一列划分成一个tensor tuple
-    input = torch.stack(torch.stack([item[0]
-                        for item in data]).chunk(input_window, 1))
-    target = torch.stack(torch.stack([item[1]
-                         for item in data]).chunk(input_window, 1))
-    return input, target
 
 # train_data = create_inout_sequences(train_data,input_window)的[:-output_window]部分
 # 训练集:[[[0,100],[1,101]],[[1,101],[2,102]]...]
-
-
 def train(train_data):
     # 设置为trainning模式,启用BatchNormalization和Dropout
     model.train()
@@ -310,7 +171,8 @@ def plot_and_loss(eval_model, data_source, epoch):
     pyplot.plot(test_result-truth, color="green")
     pyplot.grid(True, which='both')
     pyplot.axhline(y=0, color='k')
-    pyplot.savefig('./graph/TransformerSinglestep-Epoch%d.png' % epoch)
+    # pyplot.savefig('./img/SingleStep-Epoch%d.png' % epoch)
+    pyplot.savefig('./Experiment/TransformerSingleStep/img/SingleStep-Epoch%d.png' % epoch)
     pyplot.close()
 
     return total_loss / i
@@ -336,7 +198,7 @@ def predict_future(eval_model, data_source, steps):
     pyplot.plot(data[:input_window], color="blue")
     pyplot.grid(True, which='both')
     pyplot.axhline(y=0, color='k')
-    pyplot.savefig('./graph/TransformerSinglestep-Epoch%d.png' % steps)
+    pyplot.savefig('./Experiment/TransformerSingleStep/img/SingleStep-Epoch%d.png' % steps)
     pyplot.close()
 
 
