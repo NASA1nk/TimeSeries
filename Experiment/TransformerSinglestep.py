@@ -1,16 +1,16 @@
 import os
+import sys
 import time
 import math
-import torch
-import torch.nn as nn
-import numpy as np
-from matplotlib import pyplot
-from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
 from pandas import read_csv
-import sys
-sys.path.append(os.getcwd())
+import numpy as np
+from matplotlib import pyplot
+import torch
+import torch.nn as nn
+from sklearn.preprocessing import MinMaxScaler
 
+sys.path.insert(0,os.getcwd())
 
 torch.manual_seed(42)
 np.random.seed(42)
@@ -21,6 +21,8 @@ input_window = 100
 output_window = 1
 
 batch_size = 20
+
+# 获取device，后续可以调用to(device)把Tensor移动到device上
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -64,15 +66,9 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, x):
         """
-            前向传播,将embedding后的输入加上position encoding\n
-            x=(S,N,E),S是source sequence length, N是batch size,E是feature number\n
-            即(batch_len,batch_size,d_model)
-
-        Args:
-            x (_type_): _description_
-
-        Returns:
-            _type_: _description_
+            前向传播,将embedding后的输入加上position encoding
+            x=(S,N,E),S是source sequence length, N是batch size,E是feature number
+            即(source_sequence_length, batch_size, d_model)
         """
 
         return x + self.pe[:x.size(0), :]
@@ -114,7 +110,9 @@ class TransformerModel(nn.Module):
 
         self.pos_encoder = PositionalEncoding(feature_size)
         self.encoder_layer = nn.TransformerEncoderLayer(
-            d_model=feature_size, nhead=10, dropout=dropout)
+                                                        d_model=feature_size, 
+                                                        nhead=10, 
+                                                        dropout=dropout)
         self.transformer_encoder = nn.TransformerEncoder(
             self.encoder_layer, num_layers=num_layers)
 
@@ -150,11 +148,12 @@ class TransformerModel(nn.Module):
 
     def _generate_square_subsequent_mask(self, sz):
         """
-            为输入序列生成一个相同规模的square mask(方阵),在掩蔽的位置填充float('-inf')，正常位置填充float(0.0)\n
+            调用：_generate_square_subsequent_mask(len(src))
+            为输入序列生成一个相同规模的square mask(方阵),在掩蔽的位置填充float('-inf')，正常位置填充float(0.0)
             首先生成上三角矩阵，然后转置mask，最后填充-inf达到掩蔽效果
         """
-        # torch.ones(n, m)返回一个n*m的tensor
-        # torch.triu(input, diagonal=0, out=None)→Tensor，input即生成的sz大小的tensor，diagonal为空保留输入矩阵主对角线与主对角线以上的元素，其他元素置0，然后将数字转换为True和False，然后转置mask
+        # torch.ones(n, m)返回一个n*m的tensor，这里根据len(src) = 100
+        # torch.triu(input, diagonal=0, out=None)→Tensor，input即生成的sz=100大小的tensor，diagonal为空保留输入矩阵主对角线与主对角线以上的元素，其他元素置0（即上三角矩阵），然后将数字转换为True和False，然后转置mask
         mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
         # masked_fill(mask, value) → tensor，在mask值为1的位置处用value填充,mask的元素个数需要和tensor相同,但尺寸可以不同
         mask = mask.float().masked_fill(mask == 0, float(
@@ -166,23 +165,22 @@ class TransformerModel(nn.Module):
 
 def create_inout_sequences(input_data, tw):
     """
+        调用：train_sequence = create_inout_sequences(train_data, input_window)
         处理原始数据集得到模型的训练集，并转换为tensor
-        train_sequence = create_inout_sequences(train_data,input_window)
-        每次从数据集中取出目标窗口(tw)长度的数据：数据集的(i,i+100)部分是输入，数据集的(i+1,i+100+1)部分是输出，即监督学习的对应的输出(label)\n
-        得到训练集:[[[0...100],[1...101]],[[1...101],[2...102]]...]
+        每次从数据集中取出目标窗口(tw)长度的数据：(i,i+100)部分是输入，(i+1,i+100+1)部分是输出，即监督学习的对应的label
+        最终得到训练集[ ([0-100],[1-101]), ([1-101],[2-102]), ..., ([1899-1999],[1900-2000]) ]，共1900个数据
 
     Args:
-        input_data: 原始训练集，即train_data
+        input_data: 原始数据，即train_data
         tw: 输入窗口，即input_window = 100
     """
     inout_seq = []
     L = len(input_data)
-    # print(f'len: {L}')
     for i in range(L-tw):
         train_seq = input_data[i:i+tw]
         train_label = input_data[i+output_window:i+tw+output_window]
         inout_seq.append((train_seq, train_label))
-    # 将训练集转换成tensor
+    # 转换成tensor
     return torch.FloatTensor(inout_seq)
 
 
@@ -194,14 +192,12 @@ def get_data():
     """
 
     # header=0，使用数据文件的第一行作为列名称，将第一列作为索引
-    series = read_csv('./data/minutedata.csv', header=0,
+    series = read_csv('./Experiment/data/Prometheus/minutedata.csv', header=0,
                       index_col=0, parse_dates=True, squeeze=True)
     scaler = MinMaxScaler(feature_range=(-1, 1))
     # reshape()更改数据的行列数，(-1, 1)将series变为一列 (2203,1)，归一化后再(-1)变为一行 (2203,)
-    amplitude = scaler.fit_transform(
-        series.to_numpy().reshape(-1, 1)).reshape(-1)
+    amplitude = scaler.fit_transform(series.to_numpy().reshape(-1, 1)).reshape(-1)
     # 反归一化：reamplitude = scaler.inverse_transform(amplitude.reshape(-1, 1)).reshape(-1)
-
     sampels = 2000
     # (2000,)
     train_data = amplitude[:sampels]
@@ -222,8 +218,8 @@ def get_data():
 
 def get_batch(source, i, batch_size):
     """
-        把源数据细分为长度为batch_size的块，生成模型训练的输入序列和目标序列
-        data, targets = get_batch(train_data, i, batch_size)
+        调用：data, targets = get_batch(train_data, i, batch_size)
+        把源数据分为长度为batch_size的块，生成模型训练的输入和输入数据
     Args:
         source: 即train_data
         i: 每组数据从i开始,即当前batch的起始索引
@@ -233,10 +229,9 @@ def get_batch(source, i, batch_size):
     # 每个batch的数据
     data = source[i:i+seq_len]
     # torch.stack(inputs, dim=?)→Tensor，对inputs(多个tensor)沿指定维度dim拼接，返回一维的tensor
-    # 即source = [([0...100],[1...101]),([1...101],[2...102])...]，取出item[0]拼接,即train_seq = [[0...100],[1...101]...]
+    # 即source = [([0...100],[1...101]), ([1...101],[2...102])...]，取出item[0]拼接,即train_seq = [[0...100],[1...101]...]
     # torch.chunk(tensor, chunk_num, dim)将tensor在指定维度上(0行,1列)分为n块,返回一个tensor list,是一个tuple
-    # 即将拼接后的source按每一列分成一个tensor
-    # item[0]是输出,item[1]是对应的target
+    # 即将拼接后的source按每一列划分成一个tensor tuple
     input = torch.stack(torch.stack([item[0]
                         for item in data]).chunk(input_window, 1))
     target = torch.stack(torch.stack([item[1]
@@ -253,16 +248,12 @@ def train(train_data):
     # 一个epoch总的损失
     total_loss = 0.
     start_time = time.time()
-
-    # 将训练集按batch_size=10划分成一个个batch训练,所有的batch计算为一次epoch
-    # range()按batch_size步长生成索引, enumerate()同时列出数据和数据索引
     # 根据每次划分得到的i获取每一个batch的数据
-
     for batch, i in enumerate(range(0, len(train_data) - 1, batch_size)):
         data, targets = get_batch(train_data, i, batch_size)
 #         反向传播前将梯度清零，即将loss关于weight的导数变成0
         optimizer.zero_grad()
-#         前向传播,即把数据输入网络中并得到输出
+#         前向传播,即把数据输入网络（调模型中的forward函数）中并得到输出
         output = model(data)
 #         均方损失函数:criterion = nn.MSELoss() = (x-y)^2
         loss = criterion(output, targets)
@@ -270,9 +261,8 @@ def train(train_data):
         loss.backward()
 #         梯度裁剪:在BP过程中会产生梯度消失（偏导无限接近0）解决方法是设定一个阈值,当梯度小于阈值时更新的梯度为阈值
         torch.nn.utils.clip_grad_norm_(model.parameters(), 0.7)
-#         根据梯度更新网络参数
+#         根据梯度更新网络参数（通常用在每个batch中，应该在train()中，只有这样模型才会更新）
         optimizer.step()
-
         # 获取loss的标量item()得到一个元素张量里面的元素值，即将一个零维张量转换成浮点数
         total_loss += loss.item()
 #         打印训练信息
@@ -282,22 +272,23 @@ def train(train_data):
 #             训练时间
             elapsed = time.time() - start_time
 #             打印日志:第几个epoch,第几个batch,一个epoch的batch总数,学习率,损失函数,训练时间
-            print('| epoch {:3d} | {:5d}/{:5d} batches | '
+            print('| epoch {:2d} | {:5d} / {:} batches | '
                   'lr {:02.6f} | {:5.2f} ms | '
-                  'loss {:5.5f} | ppl {:8.2f}'.format(
-                      epoch, batch, len(
-                          train_data) // batch_size, scheduler.get_lr()[0],
-                      elapsed * 1000 / log_interval,
-                      cur_loss, math.exp(cur_loss)))
+                  'loss {:5.5f} | ppl {:5.2f}'.format(
+                                                    epoch, 
+                                                    batch, 
+                                                    len(train_data) // batch_size,
+                                                    scheduler.get_last_lr()[0],
+                                                    elapsed*1000 / log_interval,
+                                                    cur_loss, 
+                                                    math.exp(cur_loss)))
             total_loss = 0
             start_time = time.time()
 
 
 # 可视化损失函数
-
 def plot_and_loss(eval_model, data_source, epoch):
-
-    #     设置为evaluation模式,不启用BatchNormalization和Dropout,将BatchNormalization和Dropout置为False
+#     设置为evaluation模式,不启用BatchNormalization和Dropout,将BatchNormalization和Dropout置为False
     eval_model.eval()
     total_loss = 0.
     test_result = torch.Tensor(0)
@@ -319,7 +310,7 @@ def plot_and_loss(eval_model, data_source, epoch):
     pyplot.plot(test_result-truth, color="green")
     pyplot.grid(True, which='both')
     pyplot.axhline(y=0, color='k')
-    pyplot.savefig('graph/transformer-epoch%d.png' % epoch)
+    pyplot.savefig('./graph/TransformerSinglestep-Epoch%d.png' % epoch)
     pyplot.close()
 
     return total_loss / i
@@ -345,7 +336,7 @@ def predict_future(eval_model, data_source, steps):
     pyplot.plot(data[:input_window], color="blue")
     pyplot.grid(True, which='both')
     pyplot.axhline(y=0, color='k')
-    pyplot.savefig('graph/transformer-future%d.png' % steps)
+    pyplot.savefig('./graph/TransformerSinglestep-Epoch%d.png' % steps)
     pyplot.close()
 
 
@@ -365,6 +356,7 @@ def evaluate(eval_model, data_source):
 
 
 if __name__ == "__main__":
+    print(os.getcwd())
     # 获取训练数据集和测试数据集
     train_data, val_data = get_data()
     # 初始化模型
@@ -379,21 +371,17 @@ if __name__ == "__main__":
     #optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
     # torch.optim.lr_scheduler.StepLR(optimizer, step_size, gamma=0.1, last_epoch=-1)
-    # 每step_size个epoch后更新一次学习率，每次更新为当前学习率的0.95倍
+    # step_size参数表示每当scheduler.step()被调用step_size次，更新一次学习率，每次更新为当前学习率的0.95倍
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
-
     # 设置100个epochs
     epochs = 100
-
     best_val_loss = float("inf")
     best_model = None
-
-    for epoch in range(1, epochs + 1):
+    for epoch in range(1, epochs+1):
         epoch_start_time = time.time()
-
         # 开始训练
         train(train_data)
-        # 每10个epoch打印一次信息
+        # 每10个epoch打印一次信息，并且预测一次
         if(epoch % 10 is 0):
             val_loss = plot_and_loss(model, val_data, epoch)
             predict_future(model, val_data, 200)
@@ -401,13 +389,15 @@ if __name__ == "__main__":
             val_loss = evaluate(model, val_data)
 
         print('-' * 89)
-        print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.5f} | valid ppl {:8.2f}'.format(epoch, (time.time() - epoch_start_time),
-                                                                                                      val_loss, math.exp(val_loss)))
+        print('| end of epoch {:2d} | time: {:5.2f}s | valid loss {:5.5f} | valid ppl {:4.2f}'.format(
+                                                                                                    epoch, 
+                                                                                                    (time.time() - epoch_start_time),
+                                                                                                    val_loss, math.exp(val_loss)))
         print('-' * 89)
-
         # 存储最优模型
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_model = model
 
+        # 对lr进行调整（通常用在一个epoch中，放在train()之后的）
         scheduler.step()
