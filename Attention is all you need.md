@@ -624,124 +624,59 @@ Decoder的输出会经过一个线性变换和softmax层
 
 > Decoder的每次timestamp的输入都是之前的前一次的输出，为什么是并行？
 
-- 在训练的时候，把所有的target序列直接作为decoder的输入，然后通过mask作用得到的序列来模拟不同timestamp
-- 在预测的时候，才是真正将decoder的输出作为下一次的输入
+- 在训练的时候，**把所有的target序列直接作为decoder的输入，然后通过mask作用得到的序列来模拟不同timestamp的序列**
+- 在预测的时候，才是真正将decoder的输出作为下一次的输入，即每次输入不同长度的序列
 
-```python
-def evaluate(inp_sentence):
-  start_token = [tokenizer_pt.vocab_size]
+### demo
 
-  end_token = [tokenizer_pt.vocab_size + 1]
-
-  # inp sentence is portuguese, hence adding the start and end token
-  inp_sentence = start_token + tokenizer_pt.encode(inp_sentence) + end_token
-  encoder_input = tf.expand_dims(inp_sentence, 0)
-
-  # as the target is english, the first word to the transformer should be the
-  # english start token.
-  decoder_input = [tokenizer_en.vocab_size] # <start_of_sentence>
-  output = tf.expand_dims(decoder_input, 0)
-
-  for i in range(MAX_LENGTH):
-    print(output)
-    enc_padding_mask, combined_mask, dec_padding_mask = create_masks(
-        encoder_input, output)
-    predictions, attention_weights = transformer(encoder_input,
-                                                 output,
-                                                 False,
-                                                 enc_padding_mask,
-                                                 combined_mask,
-                                                 dec_padding_mask)
-
-    # select the last word from the seq_len dimension
-    predictions = predictions[: ,-1:, :]  # (batch_size, 1, vocab_size)
-
-    predicted_id = tf.cast(tf.argmax(predictions, axis=-1), tf.int32)
-
-    # return the result if the predicted_id is equal to the end token
-    if predicted_id == tokenizer_en.vocab_size+1: # <end_of_sentence>
-      return tf.squeeze(output, axis=0), attention_weights
-
-    # concatentate the predicted_id to the output which is given to the decoder
-    # as its input.
-    output = tf.concat([output, predicted_id], axis=-1)
-
-  return tf.squeeze(output, axis=0), attention_weights
-translate("este é um problema que temos que resolver.")
-print ("Real translation: this is a problem we have to solve .")
->> tf.Tensor([[8087]], shape=(1, 1), dtype=int32)
->> tf.Tensor([[8087   16]], shape=(1, 2), dtype=int32)
->> tf.Tensor([[8087   16   13]], shape=(1, 3), dtype=int32)
->> tf.Tensor([[8087   16   13    7]], shape=(1, 4), dtype=int32)
->> tf.Tensor([[8087   16   13    7  328]], shape=(1, 5), dtype=int32)
->> tf.Tensor([[8087   16   13    7  328   10]], shape=(1, 6), dtype=int32)
->> tf.Tensor([[8087   16   13    7  328   10   14]], shape=(1, 7), dtype=int32)
->> tf.Tensor([[8087   16   13    7  328   10   14   24]], shape=(1, 8), dtype=int32)
->> tf.Tensor([[8087   16   13    7  328   10   14   24    5]], shape=(1, 9), dtype=int32)
->> tf.Tensor([[8087   16   13    7  328   10   14   24    5  966]], shape=(1, 10), dtype=int32)
->> tf.Tensor([[8087   16   13    7  328   10   14   24    5  966   19]], shape=(1, 11), dtype=int32)
->> tf.Tensor([[8087   16   13    7  328   10   14   24    5  966   19    2]], shape=(1, 12), dtype=int32)
-Input: este é um problema que temos que resolver.
-Predicted translation: this is a problem that we have to solve it .
-Real translation: this is a problem we have to solve .
-```
-
-## demo
-
-对单个句子训练时候，输入到 decoder的分别是
+在对单个句子训练时候，输入到decoder的分别是
 
 ```bash
 <bos>
-
 <bos>，“i”
-
 <bos>，“i”，“love”
-
-<bos>，“i”，"love "，“machine”
-
-<bos>，“i”，"love "，“machine”，“learning”
+<bos>，“i”，“love”，“machine”
+<bos>，“i”，“love”，“machine”，“learning”
 ```
 
 将这些输入组成矩阵进行输入
 
 ```bash
-[<bos>
-<bos>，“i”
-<bos>，“i”，“love”
-<bos>，“i”，"love "，“machine”
-<bos>，“i”，"love "，“machine”，“learning”]
+[<bos>]
+[<bos>，“i”]
+[<bos>，“i”，“love”]
+[<bos>，“i”，“love”，“machine”]
+[<bos>，“i”，“love”，“machine”，“learning”]
 ```
 
-将decoder在上述2-6步次的输入补全为一个完整的句子
+**如果将所有完整的句子输入到encoder中，就需要掩盖掉一些部分**
 
 ```bash
-[<bos>，“i”，"love "，“machine”，“learning”
-<bos>，“i”，"love "，“machine”，“learning”
-<bos>，“i”，"love "，“machine”，“learning”
-<bos>，“i”，"love "，“machine”，“learning”
-<bos>，“i”，"love "，“machine”，“learning”]
+[<bos>，“i”，“love”，“machine”，“learning”]
+[<bos>，“i”，“love”，“machine”，“learning”]
+[<bos>，“i”，“love”，“machine”，“learning”]
+[<bos>，“i”，“love”，“machine”，“learning”]
+[<bos>，“i”，“love”，“machine”，“learning”]
 ```
 
-然后将上述矩阵矩阵乘以一个mask矩阵（上三角矩阵）
+做法就是将上述矩阵矩阵乘以一个mask矩阵
 
 ```bash
+1 0 0 0 0 
+1 1 0 0 0
+1 1 1 0 0
+1 1 1 1 0
 1 1 1 1 1
-0 1 1 1 1
-0 0 1 1 1
-0 0 0 1 1
-0 0 0 0 1
 ```
 
-就得到了
+这样就得到了不同的输入序列，**这样在训练时就可以进行并行计算**
+
+> 这个矩阵就类似于批处理，矩阵的每行是一个样本，只是每行的样本长度不一样，每行输入后最终得到一个输出概率分布
 
 ```bash
-[<bos>
-<bos>，“i”
-<bos>，“i”，“love”
-<bos>，“i”，"love "，“machine”
-<bos>，“i”，"love "，“machine”，“learning”]
+[<bos>]
+[<bos>，“i”]
+[<bos>，“i”，“love”]
+[<bos>，“i”，“love”，“machine”]
+[<bos>，“i”，“love”，“machine”，“learning”]
 ```
-
-这个矩阵就类似于批处理，矩阵的每行是一个样本，只是每行的样本长度不一样，每行输入后最终得到一个输出概率分布
-
-**这样在训练时就可以进行并行计算**
