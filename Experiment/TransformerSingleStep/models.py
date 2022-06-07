@@ -178,24 +178,26 @@ def plot_and_loss(eval_model, data_source, epoch):
             output = eval_model(data)
             # 因为没有反向传播，可以直接获取loss的标量item()
             total_loss += criterion(output, target).item()
+            writer.add_scalar('./eval/loss', criterion(output, target).item(), global_step=i)
             # torch.cat：将两个tensor拼接在一起，cat即concatenate
-            # 拼接维数dim可以不同，其余维数要相同才能对其，0表示按行（维数0）拼接，1表示按列（维数1)拼接
+            # 拼接维数dim可以不同，其余维数要相同才能对其，二维的0表示按行（维数0）拼接，1表示按列（维数1)拼接
+            # 这里是拼接每个batch中，网络的输出列表和当前标签label列表的最后一个值
             test_result = torch.cat(
                 (test_result, output[-1].view(-1).cpu()), 0)
             truth = torch.cat((truth, target[-1].view(-1).cpu()), 0)
 
-    # test_result = test_result.cpu().numpy() -> no need to detach stuff..
-    len(test_result)
-
+    # 红色是模型生成的预测值，蓝色是label，绿色是差值，即每个batch的loss
     pyplot.plot(test_result, color="red")
-    pyplot.plot(truth[:500], color="blue")
+    # pyplot.plot(truth[:500], color="blue")
+    pyplot.plot(truth, color="blue")
     pyplot.plot(test_result-truth, color="green")
     pyplot.grid(True, which='both')
     pyplot.axhline(y=0, color='k')
     # pyplot.savefig('./img/SingleStep-Epoch%d.png' % epoch)
-    pyplot.savefig('./Experiment/TransformerSingleStep/img/SingleStep-Epoch%d.png' % epoch)
+    pyplot.savefig('./Experiment/TransformerSingleStep/img/Epoch-%d.png' % epoch)
     pyplot.close()
 
+    # 返回验证集的一个epoch的平均loss
     return total_loss / i
 
 # predict the next n steps based on the input data
