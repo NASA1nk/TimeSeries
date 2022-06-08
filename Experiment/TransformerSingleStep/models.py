@@ -17,7 +17,7 @@ from embed import PositionalEncoding
 
 sys.path.insert(0,os.getcwd())
 
-writer = SummaryWriter('./log')
+writer = SummaryWriter('./logs')
 torch.manual_seed(42)
 np.random.seed(42)
 
@@ -25,9 +25,6 @@ np.random.seed(42)
 input_window = 100
 # 预测窗口
 output_window = 1
-
-# batch_size = 20
-batch_size = 32
 
 # 指定device，后续可以调用to(device)把Tensor移动到device上
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -257,6 +254,7 @@ if __name__ == "__main__":
     # step_size参数表示每当scheduler.step()被调用step_size次，更新一次学习率，每次更新为当前学习率的0.95倍
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
     # 设置100个epochs
+    batch_size = 32
     epochs = 100
     best_val_loss = float("inf")
     best_model = None
@@ -267,7 +265,7 @@ if __name__ == "__main__":
         # 每10个epoch打印一次信息，并且预测一次
         if(epoch % 10 is 0):
             val_loss = plot_and_loss(model, val_data, epoch)
-            predict_future(model, val_data, 200)
+            predict_future(model, val_data, 100)
         else:
             val_loss = evaluate(model, val_data)
 

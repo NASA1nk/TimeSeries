@@ -54,7 +54,6 @@ def get_data(path):
     amplitude = scaler.fit_transform(df['value'].to_numpy().reshape(-1, 1)).reshape(-1)
     # 反归一化：reamplitude = scaler.inverse_transform(amplitude.reshape(-1, 1)).reshape(-1)
     sampels = 100000
-    # sampels = 2000
     train_data = amplitude[:sampels]
     test_data = amplitude[sampels:]
 
