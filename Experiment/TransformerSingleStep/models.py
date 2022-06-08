@@ -26,7 +26,8 @@ input_window = 100
 # 预测窗口
 output_window = 1
 
-batch_size = 20
+# batch_size = 20
+batch_size = 32
 
 # 指定device，后续可以调用to(device)把Tensor移动到device上
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -238,9 +239,9 @@ def evaluate(eval_model, data_source):
 
 
 if __name__ == "__main__":
-    print(os.getcwd())
+    path = './Experiment/data/2018AIOpsData/KPIData/kpi_1.csv'
     # 获取训练数据集和测试数据集
-    train_data, val_data = get_data()
+    train_data, val_data = get_data(path)
     # 初始化模型（实例化网络），然后迁移到gpu上
     model = TransformerModel().to(device)
     # 定义均方损失函数

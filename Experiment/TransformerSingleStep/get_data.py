@@ -3,7 +3,6 @@ import sys
 import time
 import math
 import pandas as pd
-from pandas import read_csv
 import numpy as np
 from matplotlib import pyplot
 import torch
@@ -40,7 +39,7 @@ def create_inout_sequences(input_data, tw):
     return torch.FloatTensor(inout_seq)
 
 
-def get_data():
+def get_data(path):
     """
         导入CSV数据，对数据做归一化处理,提升模型的收敛速度,提升模型的精度
         初始化scaler在(-1,1)之间,然后使用scaler归一化数据，amplitude指序列振幅
@@ -48,14 +47,14 @@ def get_data():
     """
 
     # header=0，使用数据文件的第一行作为列名称，将第一列作为索引
-    series = read_csv('./Experiment/data/Prometheus/minutedata.csv', header=0,
-                      index_col=0, parse_dates=True, squeeze=True)
+    df = pd.read_csv(path, header=0, index_col=0, parse_dates=True, squeeze=True)
     scaler = MinMaxScaler(feature_range=(-1, 1))
-    # reshape()更改数据的行列数，(-1, 1)将series变为一列 (2203,1)，归一化后再(-1)变为一行 (2203,)
-    amplitude = scaler.fit_transform(series.to_numpy().reshape(-1, 1)).reshape(-1)
+    # reshape()更改数据的行列数，(-1, 1)将df变为一列 (2203,1)，归一化后再(-1)变为一行 (2203,)
+    # amplitude = scaler.fit_transform(df.to_numpy().reshape(-1, 1)).reshape(-1)
+    amplitude = scaler.fit_transform(df['value'].to_numpy().reshape(-1, 1)).reshape(-1)
     # 反归一化：reamplitude = scaler.inverse_transform(amplitude.reshape(-1, 1)).reshape(-1)
-    sampels = 2000
-    # (2000,)
+    sampels = 100000
+    # sampels = 2000
     train_data = amplitude[:sampels]
     test_data = amplitude[sampels:]
 
