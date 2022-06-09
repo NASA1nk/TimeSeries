@@ -47,6 +47,7 @@ def get_data(path):
     # header=0，使用数据文件的第一行作为列名称，将第一列作为索引
     df = pd.read_csv(path, header=0, index_col=0, parse_dates=True, squeeze=True)
     # series = df.to_numpy()
+    # 通过df.loc来限制行列
     series = df['value'].to_numpy()
     scaler = MinMaxScaler(feature_range=(-1, 1))
     # reshape()更改数据的行列数，(-1, 1)将df变为一列 (2203,1)，归一化后再(-1)变为一行 (2203,)

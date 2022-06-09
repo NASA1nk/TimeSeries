@@ -259,9 +259,9 @@ if __name__ == "__main__":
         train(train_data)
         # 每10个epoch打印一次信息，并且预测一次
         if(epoch % 10 is 0):
-            val_loss = plot_and_loss(model, val_data, epoch)
+            val_loss = plot_and_loss(model, val_data)
             # 预测20步
-            predict(model, val_data, 10, epoch)
+            predict(model, val_data, 10)
         else:
             val_loss = evaluate(model, val_data)
         print('-' * 85)
