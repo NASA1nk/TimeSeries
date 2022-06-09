@@ -17,7 +17,7 @@ from embed import PositionalEncoding
 
 sys.path.insert(0,os.getcwd())
 
-writer = SummaryWriter('./logs')
+writer = SummaryWriter('./logs',flush_secs=60)
 torch.manual_seed(42)
 np.random.seed(42)
 
@@ -103,7 +103,7 @@ def train(train_data):
     model.train()
     # 一个epoch总的损失
     total_loss = 0.
-    draw_loss = 0.
+    avg_loss = 0.
     start_time = time.time()
     # 根据每次划分得到的i获取每一个batch的数据
     for batch, i in enumerate(range(0, len(train_data)-1, batch_size)):
@@ -115,100 +115,92 @@ def train(train_data):
         loss = criterion(output, targets)
         # 反向传播梯度
         loss.backward()
-        # 梯度裁剪:在BP过程中会产生梯度消失（偏导无限接近0）解决方法是设定一个阈值，当梯度小于阈值时更新的梯度为阈值
+        # 梯度裁剪：在BP过程中会产生梯度消失（偏导无限接近0）解决方法是设定一个阈值，当梯度小于阈值时更新的梯度为阈值
         torch.nn.utils.clip_grad_norm_(model.parameters(), 0.7)
         # 根据梯度反向传播来更新网络参数（通常用在每个batch中，应该在train()中，只有这样模型才会更新）
         optimizer.step()
         # 获取loss的标量，item():得到一个元素张量里面的元素值，即将一个零维张量转换成浮点数
         total_loss += loss.item()
-        draw_loss += loss.item()
-        # 打印训练信息
+        avg_loss += len(data[0]) * loss.item()
+        # 把整个epoch分为5部分，分别打印训练信息
         log_interval = int(len(train_data) / batch_size / 5)
         if batch % log_interval == 0 and batch > 0:
             cur_loss = total_loss / log_interval
-            # 训练时间
-            elapsed = time.time() - start_time
-            # 打印日志:第几个epoch,第几个batch,一个epoch的batch总数,学习率,损失函数,训练时间
+            # 这部分轮训练花费的时间
+            cost_time = time.time() - start_time
+            # 第几个epoch，当前的batch数目/一个epoch的总batch数，学习率，训练花费时间，MSEloss
             print('| epoch {:2d} | {:5d} / {:} batches | '
                   'lr {:02.6f} | {:5.2f} ms | '
                   'loss {:5.5f} | ppl {:5.2f}'.format(
                                                     epoch, 
-                                                    batch, 
-                                                    len(train_data) // batch_size,
+                                                    batch, len(train_data) // batch_size,
                                                     scheduler.get_last_lr()[0],
-                                                    elapsed*1000 / log_interval,
+                                                    cost_time / log_interval * 1000,
                                                     cur_loss, 
                                                     math.exp(cur_loss)))
             total_loss = 0
             start_time = time.time()
-        
-    # 记录关键指标,保存在本地
-    writer.add_scalar('./train/loss', draw_loss/batch)
+    avg_loss = avg_loss / len(train_data)
+    writer.add_scalar('./train_loss', avg_loss, epoch) 
+    
 
-
+# 评估训练后的模型
 def evaluate(eval_model, data_source):
     # 设置为evaluation模式，不启用BatchNormalization和Dropout，将BatchNormalization和Dropout置为False（training的属性置为False）
     eval_model.eval()
     total_loss = 0.
     eval_batch_size = 64
+    # 表明当前计算不需要反向传播
     with torch.no_grad():
         for i in range(0, len(data_source)-1, eval_batch_size):
             data, targets = get_batch(data_source, i, eval_batch_size)
             # 模型的评估和模型的训练逻辑基本相同，唯一的区别是评估只需要forward pass，不需要backward pass
             output = eval_model(data)
+            # 没有反向传播，可以直接获取loss的标量item()
             loss = criterion(output, targets).cpu().item()
+            # 以batch为单位计算的loss
             total_loss += len(data[0]) * loss
-    return total_loss / len(data_source)
+    # 返回整个验证集的所有元素的平均MSEloss
+    avg_loss = total_loss / len(data_source)
+    # 记录关键指标,保存在本地
+    writer.add_scalar('./eval_loss', avg_loss, epoch)
+    return avg_loss
 
-# 可视化损失函数
-def plot_and_loss(eval_model, data_source, epoch):
-    """
-        调用：val_loss = plot_and_loss(model, val_data, epoch)，传入的是验证集val_data
-        
-    """
+
+# 可视化训练损失
+def plot_and_loss(eval_model, data_source):
     eval_model.eval()
-    # 初始化
     total_loss = 0.
     test_result = torch.Tensor(0)
     truth = torch.Tensor(0)
-    # 表明当前计算不需要反向传播
     with torch.no_grad():
+        # 相当于batch size = 1
         for i in range(0, len(data_source) - 1):
-            # batch_size = 1
+            # 传入1
             data, target = get_batch(data_source, i, 1)
-            # 得到模型的结果
             output = eval_model(data)
-            # 因为没有反向传播，可以直接获取loss的标量item()
+            # 数据长度为1
             total_loss += criterion(output, target).item()
             # torch.cat：将两个tensor拼接在一起，cat即concatenate
             # 拼接维数dim可以不同，其余维数要相同才能对其，二维的0表示按行（维数0）拼接，1表示按列（维数1)拼接
             # 这里是拼接每个batch中，网络的输出列表和当前标签label列表的最后一个值
-            test_result = torch.cat(
-                (test_result, output[-1].view(-1).cpu()), 0)
+            test_result = torch.cat((test_result, output[-1].view(-1).cpu()), 0)
             truth = torch.cat((truth, target[-1].view(-1).cpu()), 0)
-
+    # 画图
     fig, ax = plt.subplots(1, 1, figsize=(10, 6))
     fig.patch.set_facecolor('white')
-    # 红色是模型生成的预测值，蓝色是label，绿色是差值，即每个batch的简单loss
+    # 红色是模型生成的预测值，蓝色是label，绿色是差值diff，即每个batch的
     ax.plot(test_result, c='red', label='predict')
     ax.plot(truth, c='blue', label='ground_truth')
     ax.plot(test_result-truth, color="green", label="diff")
     ax.legend() 
-    # pyplot.plot(test_result, color="groundtruth")
-    # # pyplot.plot(truth[:500], color="blue")
-    # pyplot.plot(truth, color="blue")
-    # pyplot.plot(test_result-truth, color="green")
-    # 绘制网格
-    # pyplot.grid(True, which='both')
-    # 绘制平行于x轴的水平参考线
-    # pyplot.axhline(y=0, color='k')
-    plt.savefig('./Experiment/TransformerSingleStep/img/Epoch-%d.png' % epoch)
-
-    # 返回验证集的一个epoch的平均loss
+    plt.savefig(f'./Experiment/TransformerSingleStep/img/Epoch-{epoch}.png')
+    # 返回验证集所有数据的平均MSEloss
     return total_loss / i
 
+
 # predict the next n steps based on the input data
-def predict(eval_model, data_source, steps, epoch):
+def predict(eval_model, data_source, steps):
     eval_model.eval()
     total_loss = 0.
     test_result = torch.Tensor(0)
@@ -225,19 +217,14 @@ def predict(eval_model, data_source, steps, epoch):
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 6))
     fig.patch.set_facecolor('white')
-    ax.plot(data, c='red', linestyle='-.', label='data')
-    ax.plot(data[input_window:], c='black', linestyle='--', label='pred')
+    ax.plot(data, c='red', linestyle='-.', label='predict')
     ax.plot(data[:input_window], c='blue', label='ground_truth')
     ax.legend()
-    # pyplot.plot(data, color="red")
-    # pyplot.plot(data[:input_window], color="blue")
-    # pyplot.grid(True, which='both')
-    # pyplot.axhline(y=0, color='k')
     plt.savefig(f'./Experiment/TransformerSingleStep/img/predict_{steps}_{epoch/10}.png')
 
 
 if __name__ == "__main__":
-    torch.cuda.set_device(1)
+    torch.cuda.set_device(0)
     # 指定device，后续可以调用to(device)把Tensor移动到device上
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # 输入窗口
@@ -252,7 +239,7 @@ if __name__ == "__main__":
     train_data, val_data = get_data(path)
     # 初始化模型（实例化网络），然后迁移到gpu上
     model = TransformerModel().to(device)
-    # 均方损失函数:criterion = nn.MSELoss() = (x-y)^2
+    # 均方损失函数：nn.MSELoss() = (x-y)^2/n，逐元素运算
     criterion = nn.MSELoss()
     # 学习率
     lr = 0.005
@@ -277,23 +264,20 @@ if __name__ == "__main__":
             predict(model, val_data, 10, epoch)
         else:
             val_loss = evaluate(model, val_data)
-
-        print('-' * 89)
+        print('-' * 85)
         print('| End of epoch {:2d} | time: {:5.2f}s | valid loss {:5.5f} | valid ppl {:4.2f}'.format(
                                                                                                     epoch, 
                                                                                                     (time.time() - epoch_start_time),
-                                                                                                    val_loss, math.exp(val_loss)))
-        print('-' * 89)
-        
-        writer.add_scalar('./eval/loss', val_loss, global_step=epoch)
-        
+                                                                                                    val_loss, 
+                                                                                                    math.exp(val_loss)))
+        print('-' * 85)
+        writer.add_scalar('./loss', val_loss, epoch) 
         # 存储最优模型
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_model = model
-            if(epoch % 10 is 0):
+            if(epoch % 20 is 0):
                 torch.save(best_model.state_dict(), f'./Experiment/TransformerSingleStep/save_model/model_epoch_{epoch}.pth')   
-
         # 对lr进行调整（通常用在一个epoch中，放在train()之后的）
         scheduler.step()
     torch.save(best_model.state_dict(), f'./Experiment/TransformerSingleStep/save_model/best_model.pth') 

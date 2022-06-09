@@ -12,7 +12,7 @@ from sklearn.preprocessing import MinMaxScaler
 input_window = 100
 output_window = 1
 
-torch.cuda.set_device(1)
+torch.cuda.set_device(0)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
