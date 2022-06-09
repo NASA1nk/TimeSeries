@@ -5,7 +5,7 @@ import math
 import pandas as pd
 from pandas import read_csv
 import numpy as np
-from matplotlib import pyplot
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 from sklearn.preprocessing import MinMaxScaler
@@ -26,6 +26,7 @@ input_window = 100
 # 预测窗口
 output_window = 1
 
+torch.cuda.set_device(1)
 # 指定device，后续可以调用to(device)把Tensor移动到device上
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -155,6 +156,20 @@ def train(train_data):
             start_time = time.time()
 
 
+# 模型的评估和模型的训练逻辑基本相同，唯一的区别是评估只需要forward pass，不需要backward pass
+def evaluate(eval_model, data_source):
+    # Turn on the evaluation mode
+    eval_model.eval()
+    total_loss = 0.
+    eval_batch_size = 1000
+    with torch.no_grad():
+        for i in range(0, len(data_source) - 1, eval_batch_size):
+            data, targets = get_batch(data_source, i, eval_batch_size)
+            output = eval_model(data)
+            total_loss += len(data[0]) * \
+                criterion(output, targets).cpu().item()
+    return total_loss / len(data_source)
+
 # 可视化损失函数
 def plot_and_loss(eval_model, data_source, epoch):
     """
@@ -171,6 +186,7 @@ def plot_and_loss(eval_model, data_source, epoch):
     # 表明当前计算不需要反向传播
     with torch.no_grad():
         for i in range(0, len(data_source) - 1):
+            # batch_size = 1
             data, target = get_batch(data_source, i, 1)
             # 得到模型的结果
             output = eval_model(data)
@@ -184,55 +200,52 @@ def plot_and_loss(eval_model, data_source, epoch):
                 (test_result, output[-1].view(-1).cpu()), 0)
             truth = torch.cat((truth, target[-1].view(-1).cpu()), 0)
 
+    fig, ax = plt.subplots(1, 1, figsize=(20, 16))
+    fig.patch.set_facecolor('white')
     # 红色是模型生成的预测值，蓝色是label，绿色是差值，即每个batch的loss
-    pyplot.plot(test_result, color="red")
-    # pyplot.plot(truth[:500], color="blue")
-    pyplot.plot(truth, color="blue")
-    pyplot.plot(test_result-truth, color="green")
-    pyplot.grid(True, which='both')
-    pyplot.axhline(y=0, color='k')
-    # pyplot.savefig('./img/SingleStep-Epoch%d.png' % epoch)
-    pyplot.savefig('./Experiment/TransformerSingleStep/img/Epoch-%d.png' % epoch)
-    pyplot.close()
+    ax.plot(test_result, c='red', label='predict')
+    ax.plot(truth, c='blue', label='ground_truth')
+    ax.plot(test_result-truth, color="green", label="loss")
+    ax.legend() 
+    # pyplot.plot(test_result, color="groundtruth")
+    # # pyplot.plot(truth[:500], color="blue")
+    # pyplot.plot(truth, color="blue")
+    # pyplot.plot(test_result-truth, color="green")
+    # 绘制网格
+    # pyplot.grid(True, which='both')
+    # 绘制平行于x轴的水平参考线
+    # pyplot.axhline(y=0, color='k')
+    plt.savefig('./Experiment/TransformerSingleStep/img/Epoch-%d.png' % epoch)
 
     # 返回验证集的一个epoch的平均loss
     return total_loss / i
 
 # predict the next n steps based on the input data
-def predict_future(eval_model, data_source, steps):
+def predict(eval_model, data_source, steps, epoch):
     eval_model.eval()
     total_loss = 0.
     test_result = torch.Tensor(0)
     truth = torch.Tensor(0)
+    # batch_size = 1
     data, _ = get_batch(data_source, 0, 1)
     with torch.no_grad():
         for i in range(0, steps):
             output = eval_model(data[-input_window:])
+            # 拼接n步的结果
             data = torch.cat((data, output[-1:]))
 
     data = data.cpu().view(-1)
 
-    pyplot.plot(data, color="red")
-    pyplot.plot(data[:input_window], color="blue")
-    pyplot.grid(True, which='both')
-    pyplot.axhline(y=0, color='k')
-    pyplot.savefig('./Experiment/TransformerSingleStep/img/SingleStep-Epoch%d.png' % steps)
-    pyplot.close()
-
-
-# 模型的评估和模型的训练逻辑基本相同，唯一的区别是评估只需要forward pass，不需要backward pass
-def evaluate(eval_model, data_source):
-    # Turn on the evaluation mode
-    eval_model.eval()
-    total_loss = 0.
-    eval_batch_size = 1000
-    with torch.no_grad():
-        for i in range(0, len(data_source) - 1, eval_batch_size):
-            data, targets = get_batch(data_source, i, eval_batch_size)
-            output = eval_model(data)
-            total_loss += len(data[0]) * \
-                criterion(output, targets).cpu().item()
-    return total_loss / len(data_source)
+    fig, ax = plt.subplots(1, 1, figsize=(20, 16))
+    fig.patch.set_facecolor('white')
+    ax.plot(data, c='red', label='predict')
+    ax.plot(data[:input_window], c='blue', label='ground_truth')
+    ax.legend()
+    # pyplot.plot(data, color="red")
+    # pyplot.plot(data[:input_window], color="blue")
+    # pyplot.grid(True, which='both')
+    # pyplot.axhline(y=0, color='k')
+    plt.savefig(f'./Experiment/TransformerSingleStep/img/predict_{steps}_{epoch/10}.png')
 
 
 if __name__ == "__main__":
@@ -265,7 +278,7 @@ if __name__ == "__main__":
         # 每10个epoch打印一次信息，并且预测一次
         if(epoch % 10 is 0):
             val_loss = plot_and_loss(model, val_data, epoch)
-            predict_future(model, val_data, 100)
+            predict(model, val_data, 20, epoch)
         else:
             val_loss = evaluate(model, val_data)
 
@@ -279,7 +292,8 @@ if __name__ == "__main__":
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_model = model
-            torch.save(best_model.state_dict(), f'./Experiment/TransformerSingleStep/save_model/model_epoch_{epoch}.pth')   
+            if(epoch % 10 is 0):
+                torch.save(best_model.state_dict(), f'./Experiment/TransformerSingleStep/save_model/model_epoch_{epoch}.pth')   
 
         # 对lr进行调整（通常用在一个epoch中，放在train()之后的）
         scheduler.step()
@@ -295,13 +309,14 @@ if __name__ == "__main__":
     # for epoch in range(epoch_nums):
     #     model.train()
     #     for bach_idx, (features, targets) in enumerate(train_loader):
-    #         features = features.view(-1,28*28).to(device)
-    #         targets = target.to(device)
+    #         optimizer.zero_grad()
+    #         features, targets = features.view(-1,28*28).to(device), target.to(device)
     #         output = model(features)
     #         loss = criterion(output, targets)
     #         loss.backward()
     #         torch.nn.utils.clip_grad_norm_(model.parameters(), 0.7)
     #         optimizer.step()
+    #         total_loss += loss.cpu().item() * len(features)
     #         if not batch_idx % 50:
     #             print ('Epoch: %03d/%03d | Batch %03d/%03d | loss: %.4f' %(
     #                                                                     epoch+1, 
@@ -309,3 +324,28 @@ if __name__ == "__main__":
     #                                                                     batch_idx, 
     #                                                                     len(train_loader), 
     #                                                                     loss.item()))
+
+    # 测试
+    model.eval()
+    preds = []
+    # test dataset
+    for x in test_set:
+        x = x.to(device)
+        with torch.no_grad():
+            pred = model(x)
+            # collect predictio
+            preds.append(pred.cpu())
+
+    # # 保存
+    # state = {
+    #     'epoch' : epoch + 1,                    # 当前的迭代次数
+    #     'state_dict' : model.state_dict(),      # 模型参数
+    #     'optimizer' : optimizer.state_dict()    # 优化器参数
+    # }
+    # torch.save(state, f'./checkpoint/checkpoint_{epoch}.pth.tar')     #将state中的信息保存到checkpoint.pth.tar
+    # #Pytorch 约定使用.tar格式来保存这些检查点
+    # # 恢复训练
+    # checkpoint = torch.load(f'./checkpoint/checkpoint_{epoch}.pth.tar')
+    # epoch = checkpoint['epoch']
+    # model.load_state_dict(checkpoint['state_dict'])
+    # optimizer.load_state_dict(checkpoint['optimizer'])

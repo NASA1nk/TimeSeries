@@ -129,4 +129,4 @@ if __name__ == "__main__":
         # plt.show()
         dataframes.append(df)
     all_data = pd.concat(dataframes, ignore_index=True)
-    all_data.to_csv("../data/data.csv", index=False)
+    all_data.to_csv("/home/yinke/TimeSeries/Experiment/data/generate_time_data.csv", index=False)

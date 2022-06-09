@@ -43,7 +43,7 @@ def get_data(path):
     """
         导入CSV数据，对数据做归一化处理,提升模型的收敛速度,提升模型的精度
         初始化scaler在(-1,1)之间,然后使用scaler归一化数据，amplitude指序列振幅
-        根据sampels将数据划分为数据集和测试集，调用create_inout_sequences()将其转换为tensor
+        根据sample将数据划分为数据集和测试集，调用create_inout_sequences()将其转换为tensor
     """
 
     # header=0，使用数据文件的第一行作为列名称，将第一列作为索引
@@ -53,9 +53,9 @@ def get_data(path):
     # amplitude = scaler.fit_transform(df.to_numpy().reshape(-1, 1)).reshape(-1)
     amplitude = scaler.fit_transform(df['value'].to_numpy().reshape(-1, 1)).reshape(-1)
     # 反归一化：reamplitude = scaler.inverse_transform(amplitude.reshape(-1, 1)).reshape(-1)
-    sampels = 100000
-    train_data = amplitude[:sampels]
-    test_data = amplitude[sampels:]
+    sample = 100000
+    train_data = amplitude[:sample]
+    test_data = amplitude[sample:]
 
     # view(-1)变成一行
     # train_tensor = torch.FloatTensor(train_data).view(-1)
