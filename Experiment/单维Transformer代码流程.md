@@ -1055,6 +1055,41 @@ tensor([[[-0.6021]],
 
 
 
+# 评估
+
+每一个epoch结束后（所有数据都训练过一遍），传入验证集，评估实验结果
+
+评估和训练的流程是一样的，只是此时用训练好的参数，不在反向传播更新参数
+
+- `eval_model.eval()`
+- `with torch.no_grad()`
+
+> eval batch size如何设置？
+
+**计算整个数据集的平均loss**
+
+- 当**eval batch size = 64**时，每次获取的数据即**(100,64,1)**
+
+- 计算每次的loss
+
+> 通常损失函数都是直接计算 batch 的数据，所以返回的 loss 是维度为 (batch_size, ) 的向量
+>
+> 那么可以理解，这个loss是计算了一个batch，64个数据的loss，所以计算处理乘以了len(data[0])
+>
+> 不直接乘batch size是因为最后一个batch的数量不足batch size
+>
+> **data[0]即(64,1)**，因为是**100个(64×1)**的数据，所以**len(data[0]) = 64**
+
+```python
+# 即64 * loss
+total_loss += len(data[0]) * loss
+
+# 整个验证集的平均loss
+total_loss / len(data_source)
+```
+
+
+
 # 预测
 
 ## data
