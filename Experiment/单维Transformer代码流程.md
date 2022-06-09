@@ -1012,7 +1012,7 @@ tensor([[[-0.5739]],
         [[-0.6140]]], device='cuda:0')
 ```
 
-计算整个batch（即验证集的一个epoch）的total_loss
+计算整个batch（即验证集的一个epoch）的total_oss
 
 ```python
 total_loss += criterion(output, target).item()
@@ -1051,5 +1051,57 @@ tensor([[[-0.6021]],
         [[-0.5717]],
 
         [[-0.8837]]], device='cuda:0')
+```
+
+
+
+# 预测
+
+## data
+
+预测的数据输入是sample划分的验证集
+
+```python
+test_data = amplitude[sample:]
+
+# 其实index = 0
+data, _ = get_batch(data_source, 0, 1)
+```
+
+**batch size = 1**，所以最开始拿到的数据为**(1,2,100)**，然后切分后变成输入**(100,1,1)**
+
+即验证集开始，用前100个数据往后预测
+
+- **个人理解因为训练是按input window = 100来训练的**
+
+> 因为在处理数据的时候已经划分成一个个100长度的数据了，所以这里输入1，就是100长度
+
+```bash
+tensor([[[-0.2591]],
+
+        ...
+
+        [[-0.3352]],
+
+        [[-0.3458]]], device='cuda:1')
+```
+
+
+
+## step
+
+由loss计算可以看出，decoder的输出的输入的向后偏移一位（即只预测一个），即**[0,100]到[1,101]**
+
+所以如果**要预测n步**，就需要每次获取输出后，将输出的最后一个值**output[-1:]**（即**预测值）添加到原始输入中**，再继续进行预测，重复n次
+
+- 并且每次只用拼接后的输入的后100的值（**input_window = 100**）来预测1个值
+
+> 对于获取最后一个值，output是tensor，所以就是[-1:]，python只能是[-1]
+
+```python
+for i in range(0, steps):
+    output = eval_model(data[-input_window:])
+    # 拼接n步的结果
+    data = torch.cat((data, output[-1:]))
 ```
 
