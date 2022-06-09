@@ -21,18 +21,8 @@ writer = SummaryWriter('./logs')
 torch.manual_seed(42)
 np.random.seed(42)
 
-# 输入窗口
-input_window = 100
-# 预测窗口
-output_window = 1
-
-torch.cuda.set_device(1)
-# 指定device，后续可以调用to(device)把Tensor移动到device上
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 # torch.nn.Module是所有NN的基类
-
 class TransformerModel(nn.Module):
     # 定义模型网络结构
     def __init__(self, feature_size=250, num_layers=1, dropout=0.1):
@@ -113,28 +103,25 @@ def train(train_data):
     model.train()
     # 一个epoch总的损失
     total_loss = 0.
+    draw_loss = 0.
     start_time = time.time()
     # 根据每次划分得到的i获取每一个batch的数据
-    for batch, i in enumerate(range(0, len(train_data) - 1, batch_size)):
+    for batch, i in enumerate(range(0, len(train_data)-1, batch_size)):
         data, targets = get_batch(train_data, i, batch_size)
         # 反向传播前将梯度清零，即将loss关于weight的导数变成0
         optimizer.zero_grad()
-        # 前向传播,即把数据输入网络（调模型中的forward函数）中并得到输出
+        # 前向传播，即把数据输入网络（调模型中的forward函数）中并得到输出
         output = model(data)
-        # 均方损失函数:criterion = nn.MSELoss() = (x-y)^2
         loss = criterion(output, targets)
         # 反向传播梯度
         loss.backward()
-        # 梯度裁剪:在BP过程中会产生梯度消失（偏导无限接近0）解决方法是设定一个阈值,当梯度小于阈值时更新的梯度为阈值
+        # 梯度裁剪:在BP过程中会产生梯度消失（偏导无限接近0）解决方法是设定一个阈值，当梯度小于阈值时更新的梯度为阈值
         torch.nn.utils.clip_grad_norm_(model.parameters(), 0.7)
         # 根据梯度反向传播来更新网络参数（通常用在每个batch中，应该在train()中，只有这样模型才会更新）
         optimizer.step()
-        # 获取loss的标量item()得到一个元素张量里面的元素值，即将一个零维张量转换成浮点数
+        # 获取loss的标量，item():得到一个元素张量里面的元素值，即将一个零维张量转换成浮点数
         total_loss += loss.item()
-
-        # 记录关键指标,保存在本地
-        writer.add_scalar('./train/loss', loss.item(), global_step=batch)
-        # writer.add_scalar('loss', loss, global_step=epoch)
+        draw_loss += loss.item()
         # 打印训练信息
         log_interval = int(len(train_data) / batch_size / 5)
         if batch % log_interval == 0 and batch > 0:
@@ -154,20 +141,23 @@ def train(train_data):
                                                     math.exp(cur_loss)))
             total_loss = 0
             start_time = time.time()
+        
+    # 记录关键指标,保存在本地
+    writer.add_scalar('./train/loss', draw_loss/batch)
 
 
-# 模型的评估和模型的训练逻辑基本相同，唯一的区别是评估只需要forward pass，不需要backward pass
 def evaluate(eval_model, data_source):
-    # Turn on the evaluation mode
+    # 设置为evaluation模式，不启用BatchNormalization和Dropout，将BatchNormalization和Dropout置为False（training的属性置为False）
     eval_model.eval()
     total_loss = 0.
-    eval_batch_size = 1000
+    eval_batch_size = 64
     with torch.no_grad():
-        for i in range(0, len(data_source) - 1, eval_batch_size):
+        for i in range(0, len(data_source)-1, eval_batch_size):
             data, targets = get_batch(data_source, i, eval_batch_size)
+            # 模型的评估和模型的训练逻辑基本相同，唯一的区别是评估只需要forward pass，不需要backward pass
             output = eval_model(data)
-            total_loss += len(data[0]) * \
-                criterion(output, targets).cpu().item()
+            loss = criterion(output, targets).cpu().item()
+            total_loss += len(data[0]) * loss
     return total_loss / len(data_source)
 
 # 可视化损失函数
@@ -176,13 +166,11 @@ def plot_and_loss(eval_model, data_source, epoch):
         调用：val_loss = plot_and_loss(model, val_data, epoch)，传入的是验证集val_data
         
     """
-    # 设置为evaluation模式，不启用BatchNormalization和Dropout，将BatchNormalization和Dropout置为False（training的属性置为False）
     eval_model.eval()
     # 初始化
     total_loss = 0.
     test_result = torch.Tensor(0)
     truth = torch.Tensor(0)
-
     # 表明当前计算不需要反向传播
     with torch.no_grad():
         for i in range(0, len(data_source) - 1):
@@ -192,7 +180,6 @@ def plot_and_loss(eval_model, data_source, epoch):
             output = eval_model(data)
             # 因为没有反向传播，可以直接获取loss的标量item()
             total_loss += criterion(output, target).item()
-            writer.add_scalar('./eval/loss', criterion(output, target).item(), global_step=i)
             # torch.cat：将两个tensor拼接在一起，cat即concatenate
             # 拼接维数dim可以不同，其余维数要相同才能对其，二维的0表示按行（维数0）拼接，1表示按列（维数1)拼接
             # 这里是拼接每个batch中，网络的输出列表和当前标签label列表的最后一个值
@@ -200,12 +187,12 @@ def plot_and_loss(eval_model, data_source, epoch):
                 (test_result, output[-1].view(-1).cpu()), 0)
             truth = torch.cat((truth, target[-1].view(-1).cpu()), 0)
 
-    fig, ax = plt.subplots(1, 1, figsize=(20, 16))
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
     fig.patch.set_facecolor('white')
-    # 红色是模型生成的预测值，蓝色是label，绿色是差值，即每个batch的loss
+    # 红色是模型生成的预测值，蓝色是label，绿色是差值，即每个batch的简单loss
     ax.plot(test_result, c='red', label='predict')
     ax.plot(truth, c='blue', label='ground_truth')
-    ax.plot(test_result-truth, color="green", label="loss")
+    ax.plot(test_result-truth, color="green", label="diff")
     ax.legend() 
     # pyplot.plot(test_result, color="groundtruth")
     # # pyplot.plot(truth[:500], color="blue")
@@ -236,9 +223,10 @@ def predict(eval_model, data_source, steps, epoch):
 
     data = data.cpu().view(-1)
 
-    fig, ax = plt.subplots(1, 1, figsize=(20, 16))
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
     fig.patch.set_facecolor('white')
-    ax.plot(data, c='red', label='predict')
+    ax.plot(data, c='red', linestyle='-.', label='data')
+    ax.plot(data[input_window:], c='black', linestyle='--', label='pred')
     ax.plot(data[:input_window], c='blue', label='ground_truth')
     ax.legend()
     # pyplot.plot(data, color="red")
@@ -249,12 +237,22 @@ def predict(eval_model, data_source, steps, epoch):
 
 
 if __name__ == "__main__":
+    torch.cuda.set_device(1)
+    # 指定device，后续可以调用to(device)把Tensor移动到device上
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # 输入窗口
+    input_window = 100
+    # 预测窗口
+    output_window = 1
+    batch_size = 64
+    epochs = 100
+
     path = './Experiment/data/2018AIOpsData/KPIData/kpi_1.csv'
     # 获取训练数据集和测试数据集
     train_data, val_data = get_data(path)
     # 初始化模型（实例化网络），然后迁移到gpu上
     model = TransformerModel().to(device)
-    # 定义均方损失函数
+    # 均方损失函数:criterion = nn.MSELoss() = (x-y)^2
     criterion = nn.MSELoss()
     # 学习率
     lr = 0.005
@@ -266,9 +264,6 @@ if __name__ == "__main__":
     # torch.optim.lr_scheduler.StepLR(optimizer, step_size, gamma=0.1, last_epoch=-1)
     # step_size参数表示每当scheduler.step()被调用step_size次，更新一次学习率，每次更新为当前学习率的0.95倍
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
-    # 设置100个epochs
-    batch_size = 32
-    epochs = 100
     best_val_loss = float("inf")
     best_model = None
     for epoch in range(1, epochs+1):
@@ -278,7 +273,8 @@ if __name__ == "__main__":
         # 每10个epoch打印一次信息，并且预测一次
         if(epoch % 10 is 0):
             val_loss = plot_and_loss(model, val_data, epoch)
-            predict(model, val_data, 20, epoch)
+            # 预测20步
+            predict(model, val_data, 10, epoch)
         else:
             val_loss = evaluate(model, val_data)
 
@@ -288,6 +284,9 @@ if __name__ == "__main__":
                                                                                                     (time.time() - epoch_start_time),
                                                                                                     val_loss, math.exp(val_loss)))
         print('-' * 89)
+        
+        writer.add_scalar('./eval/loss', val_loss, global_step=epoch)
+        
         # 存储最优模型
         if val_loss < best_val_loss:
             best_val_loss = val_loss
@@ -326,15 +325,15 @@ if __name__ == "__main__":
     #                                                                     loss.item()))
 
     # 测试
-    model.eval()
-    preds = []
-    # test dataset
-    for x in test_set:
-        x = x.to(device)
-        with torch.no_grad():
-            pred = model(x)
-            # collect predictio
-            preds.append(pred.cpu())
+    # model.eval()
+    # preds = []
+    # # test dataset
+    # for x in test_set:
+    #     x = x.to(device)
+    #     with torch.no_grad():
+    #         pred = model(x)
+    #         # collect predictio
+    #         preds.append(pred.cpu())
 
     # # 保存
     # state = {

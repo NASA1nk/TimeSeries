@@ -9,14 +9,12 @@ import torch
 import torch.nn as nn
 from sklearn.preprocessing import MinMaxScaler
 
-# 输入窗口
 input_window = 100
-# 预测窗口
 output_window = 1
 
-batch_size = 20
-
+torch.cuda.set_device(1)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 def create_inout_sequences(input_data, tw):
     """
@@ -48,11 +46,19 @@ def get_data(path):
 
     # header=0，使用数据文件的第一行作为列名称，将第一列作为索引
     df = pd.read_csv(path, header=0, index_col=0, parse_dates=True, squeeze=True)
+    # series = df.to_numpy()
+    series = df['value'].to_numpy()
     scaler = MinMaxScaler(feature_range=(-1, 1))
     # reshape()更改数据的行列数，(-1, 1)将df变为一列 (2203,1)，归一化后再(-1)变为一行 (2203,)
     # amplitude = scaler.fit_transform(df.to_numpy().reshape(-1, 1)).reshape(-1)
-    amplitude = scaler.fit_transform(df['value'].to_numpy().reshape(-1, 1)).reshape(-1)
+    amplitude = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
     # 反归一化：reamplitude = scaler.inverse_transform(amplitude.reshape(-1, 1)).reshape(-1)
+
+    # # 多维数据
+    # data = df.loc['col1','col2']
+    # series = df.to_numpy()
+    # amplitude = scaler.fit_transform(series)
+
     sample = 100000
     train_data = amplitude[:sample]
     test_data = amplitude[sample:]

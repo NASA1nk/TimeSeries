@@ -1,5 +1,6 @@
 from torch.utils.data import Dataset
 
+
 class MyDataset(Dataset):
     # Read data & preprocess 读数据，预处理
     def __init__(self, file):
