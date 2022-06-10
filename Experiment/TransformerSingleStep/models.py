@@ -17,7 +17,7 @@ from embed import PositionalEncoding
 
 sys.path.insert(0,os.getcwd())
 
-writer = SummaryWriter('./logs',flush_secs=60)
+
 torch.manual_seed(42)
 np.random.seed(42)
 
@@ -25,7 +25,7 @@ np.random.seed(42)
 # torch.nn.Module是所有NN的基类
 class TransformerModel(nn.Module):
     # 定义模型网络结构
-    def __init__(self, feature_size=250, num_layers=1, dropout=0.1):
+    def __init__(self, feature_size=256, num_layers=1, dropout=0.1):
         """
         编码器Encoder，只有一层encoder层
         encoder层:10个头(默认8个)，dropout=0.1(默认),FNN默认维度2048，激活函数默认是ReLU
@@ -45,7 +45,7 @@ class TransformerModel(nn.Module):
         self.pos_encoder = PositionalEncoding(feature_size)
         self.encoder_layer = nn.TransformerEncoderLayer(
                                                         d_model=feature_size, 
-                                                        nhead=10, 
+                                                        nhead=8, 
                                                         dropout=dropout)
         self.transformer_encoder = nn.TransformerEncoder(
             self.encoder_layer, num_layers=num_layers)
@@ -141,7 +141,7 @@ def train(train_data):
             total_loss = 0
             start_time = time.time()
     avg_loss = avg_loss / len(train_data)
-    writer.add_scalar('./train_loss', avg_loss, epoch) 
+    writer.add_scalar('train_loss', avg_loss, epoch) 
     
 
 # 评估训练后的模型
@@ -149,7 +149,7 @@ def evaluate(eval_model, data_source):
     # 设置为evaluation模式，不启用BatchNormalization和Dropout，将BatchNormalization和Dropout置为False（training的属性置为False）
     eval_model.eval()
     total_loss = 0.
-    eval_batch_size = 64
+    eval_batch_size = 32
     # 表明当前计算不需要反向传播
     with torch.no_grad():
         for i in range(0, len(data_source)-1, eval_batch_size):
@@ -163,7 +163,7 @@ def evaluate(eval_model, data_source):
     # 返回整个验证集的所有元素的平均MSEloss
     avg_loss = total_loss / len(data_source)
     # 记录关键指标,保存在本地
-    writer.add_scalar('./eval_loss', avg_loss, epoch)
+    writer.add_scalar('eval_loss', avg_loss, epoch)
     return avg_loss
 
 
@@ -205,14 +205,24 @@ def predict(eval_model, data_source, steps):
     total_loss = 0.
     test_result = torch.Tensor(0)
     truth = torch.Tensor(0)
-    # batch_size = 1
+    # batch_size = 1, 即(100,1,1)
     data, _ = get_batch(data_source, 0, 1)
     with torch.no_grad():
+        # 在data上以input_window大小的滑动窗口来一步步预测
         for i in range(0, steps):
+            # 在第一次预测的时候,data[-input_window:]就是data,因为data是根据input_window划分来的
             output = eval_model(data[-input_window:])
             # 拼接n步的结果
+            # output[-1:]即(1,1,1)
+            fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+            fig.patch.set_facecolor('white')
+            ax.plot(output.cpu().view(-1), c='red', linestyle='-.', label='predict')
+            ax.plot(data.cpu().view(-1), c='blue', label='ground_truth')
+            ax.legend()
+            plt.savefig(f'./Experiment/TransformerSingleStep/img/predict_{steps}_{epoch/10}_{i+1}.png')
             data = torch.cat((data, output[-1:]))
 
+    # 最后拼接的data即(100,1,100+steps)
     data = data.cpu().view(-1)
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 6))
@@ -224,6 +234,7 @@ def predict(eval_model, data_source, steps):
 
 
 if __name__ == "__main__":
+    writer = SummaryWriter(comment='512_1_32',flush_secs=60)
     torch.cuda.set_device(0)
     # 指定device，后续可以调用to(device)把Tensor移动到device上
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -231,14 +242,14 @@ if __name__ == "__main__":
     input_window = 100
     # 预测窗口
     output_window = 1
-    batch_size = 64
+    batch_size = 32
     epochs = 100
 
     path = './Experiment/data/2018AIOpsData/KPIData/kpi_1.csv'
     # 获取训练数据集和测试数据集
     train_data, val_data = get_data(path)
     # 初始化模型（实例化网络），然后迁移到gpu上
-    model = TransformerModel().to(device)
+    model = TransformerModel(feature_size=512).to(device)
     # 均方损失函数：nn.MSELoss() = (x-y)^2/n，逐元素运算
     criterion = nn.MSELoss()
     # 学习率
@@ -271,7 +282,6 @@ if __name__ == "__main__":
                                                                                                     val_loss, 
                                                                                                     math.exp(val_loss)))
         print('-' * 85)
-        writer.add_scalar('./loss', val_loss, epoch) 
         # 存储最优模型
         if val_loss < best_val_loss:
             best_val_loss = val_loss
