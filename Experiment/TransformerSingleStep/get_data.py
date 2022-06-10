@@ -12,7 +12,7 @@ from sklearn.preprocessing import MinMaxScaler
 input_window = 100
 output_window = 1
 
-torch.cuda.set_device(1)
+torch.cuda.set_device(0)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -81,10 +81,6 @@ def get_batch(source, i, batch_size):
     """
         调用：data, targets = get_batch(train_data, i, batch_size)
         把源数据分为长度为batch_size的块，生成模型训练的输入和输入数据
-    Args:
-        source: 即train_data
-        i: 每组数据从i开始,即当前batch的起始索引
-        batch_size: 10
     """
     seq_len = min(batch_size, len(source) - 1 - i)
     # 每个batch的数据

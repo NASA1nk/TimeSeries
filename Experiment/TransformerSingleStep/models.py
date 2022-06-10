@@ -149,7 +149,7 @@ def evaluate(eval_model, data_source):
     # 设置为evaluation模式，不启用BatchNormalization和Dropout，将BatchNormalization和Dropout置为False（training的属性置为False）
     eval_model.eval()
     total_loss = 0.
-    eval_batch_size = 64
+    eval_batch_size = 32
     # 表明当前计算不需要反向传播
     with torch.no_grad():
         for i in range(0, len(data_source)-1, eval_batch_size):
@@ -205,14 +205,24 @@ def predict(eval_model, data_source, steps):
     total_loss = 0.
     test_result = torch.Tensor(0)
     truth = torch.Tensor(0)
-    # batch_size = 1
+    # batch_size = 1, 即(100,1,1)
     data, _ = get_batch(data_source, 0, 1)
     with torch.no_grad():
+        # 在data上以input_window大小的滑动窗口来一步步预测
         for i in range(0, steps):
+            # 在第一次预测的时候,data[-input_window:]就是data,因为data是根据input_window划分来的
             output = eval_model(data[-input_window:])
             # 拼接n步的结果
+            # output[-1:]即(1,1,1)
+            fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+            fig.patch.set_facecolor('white')
+            ax.plot(output.cpu().view(-1), c='red', linestyle='-.', label='predict')
+            ax.plot(data.cpu().view(-1), c='blue', label='ground_truth')
+            ax.legend()
+            plt.savefig(f'./Experiment/TransformerSingleStep/img/predict_{steps}_{epoch/10}_{i+1}.png')
             data = torch.cat((data, output[-1:]))
 
+    # 最后拼接的data即(100,1,100+steps)
     data = data.cpu().view(-1)
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 6))
@@ -224,15 +234,15 @@ def predict(eval_model, data_source, steps):
 
 
 if __name__ == "__main__":
-    writer = SummaryWriter(comment='512_1_64',flush_secs=60)
-    torch.cuda.set_device(1)
+    writer = SummaryWriter(comment='512_1_32',flush_secs=60)
+    torch.cuda.set_device(0)
     # 指定device，后续可以调用to(device)把Tensor移动到device上
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # 输入窗口
     input_window = 100
     # 预测窗口
     output_window = 1
-    batch_size = 64
+    batch_size = 32
     epochs = 100
 
     path = './Experiment/data/2018AIOpsData/KPIData/kpi_1.csv'
