@@ -238,7 +238,7 @@ if __name__ == "__main__":
     output_window = 1
     batch_size = 64
     epochs = 100
-    path = './Experiment/data/2018AIOpsData/KPIData/kpi_1.csv'
+    path = './Experiment/data/2018AIOpsData/kpi_1.csv'
     # 获取训练数据集和测试数据集
     train_data, val_data = get_data(path)
     # 初始化模型（实例化网络），然后迁移到gpu上
