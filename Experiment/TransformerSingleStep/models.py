@@ -149,7 +149,7 @@ def evaluate(eval_model, data_source):
     # 设置为evaluation模式，不启用BatchNormalization和Dropout，将BatchNormalization和Dropout置为False（training的属性置为False）
     eval_model.eval()
     total_loss = 0.
-    eval_batch_size = 32
+    eval_batch_size = 64
     # 表明当前计算不需要反向传播
     with torch.no_grad():
         for i in range(0, len(data_source)-1, eval_batch_size):
@@ -158,7 +158,7 @@ def evaluate(eval_model, data_source):
             output = eval_model(data)
             # 没有反向传播，可以直接获取loss的标量item()
             loss = criterion(output, targets).cpu().item()
-            # 以batch为单位计算的loss
+            # 以batch为单位计算的loss,所以乘以batch size(最后一次不足一个batch,所以是data[0]),最后计算平均
             total_loss += len(data[0]) * loss
     # 返回整个验证集的所有元素的平均MSEloss
     avg_loss = total_loss / len(data_source)
@@ -177,15 +177,16 @@ def plot_and_loss(eval_model, data_source):
         # 相当于batch size = 1
         for i in range(0, len(data_source) - 1):
             # 传入1
-            data, target = get_batch(data_source, i, 1)
+            data, targets = get_batch(data_source, i, 1)
             output = eval_model(data)
             # 数据长度为1
-            total_loss += criterion(output, target).item()
+            loss = criterion(output, targets).cpu().item()
+            total_loss += loss
             # torch.cat：将两个tensor拼接在一起，cat即concatenate
             # 拼接维数dim可以不同，其余维数要相同才能对其，二维的0表示按行（维数0）拼接，1表示按列（维数1)拼接
             # 这里是拼接每个batch中，网络的输出列表和当前标签label列表的最后一个值
             test_result = torch.cat((test_result, output[-1].view(-1).cpu()), 0)
-            truth = torch.cat((truth, target[-1].view(-1).cpu()), 0)
+            truth = torch.cat((truth, targets[-1].view(-1).cpu()), 0)
     # 画图
     fig, ax = plt.subplots(1, 1, figsize=(10, 6))
     fig.patch.set_facecolor('white')
@@ -212,19 +213,10 @@ def predict(eval_model, data_source, steps):
         for i in range(0, steps):
             # 在第一次预测的时候,data[-input_window:]就是data,因为data是根据input_window划分来的
             output = eval_model(data[-input_window:])
-            # 拼接n步的结果
-            # output[-1:]即(1,1,1)
-            fig, ax = plt.subplots(1, 1, figsize=(10, 6))
-            fig.patch.set_facecolor('white')
-            ax.plot(output.cpu().view(-1), c='red', linestyle='-.', label='predict')
-            ax.plot(data.cpu().view(-1), c='blue', label='ground_truth')
-            ax.legend()
-            plt.savefig(f'./Experiment/TransformerSingleStep/img/predict_{steps}_{epoch/10}_{i+1}.png')
+            # 拼接n步的结果,output[-1:]即(1,1,1)
             data = torch.cat((data, output[-1:]))
-
     # 最后拼接的data即(100,1,100+steps)
     data = data.cpu().view(-1)
-
     fig, ax = plt.subplots(1, 1, figsize=(10, 6))
     fig.patch.set_facecolor('white')
     ax.plot(data, c='red', linestyle='-.', label='predict')
@@ -234,7 +226,9 @@ def predict(eval_model, data_source, steps):
 
 
 if __name__ == "__main__":
-    writer = SummaryWriter(comment='512_1_32',flush_secs=60)
+    # 目前512_1_32_0.005loss最小
+    s_time = time.time()
+    writer = SummaryWriter(comment='256_1_64',flush_secs=60)
     torch.cuda.set_device(0)
     # 指定device，后续可以调用to(device)把Tensor移动到device上
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -242,18 +236,18 @@ if __name__ == "__main__":
     input_window = 100
     # 预测窗口
     output_window = 1
-    batch_size = 32
+    batch_size = 64
     epochs = 100
-
     path = './Experiment/data/2018AIOpsData/KPIData/kpi_1.csv'
     # 获取训练数据集和测试数据集
     train_data, val_data = get_data(path)
     # 初始化模型（实例化网络），然后迁移到gpu上
-    model = TransformerModel(feature_size=512).to(device)
+    model = TransformerModel().to(device)
     # 均方损失函数：nn.MSELoss() = (x-y)^2/n，逐元素运算
     criterion = nn.MSELoss()
     # 学习率
-    lr = 0.005
+    # lr = 0.005
+    lr = 0.01
     # 定义优化器，SGD随机梯度下降优化
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
     # # 梯度下降优化算法：Adam自适应学习算法
@@ -291,7 +285,8 @@ if __name__ == "__main__":
         # 对lr进行调整（通常用在一个epoch中，放在train()之后的）
         scheduler.step()
     torch.save(best_model.state_dict(), f'./Experiment/TransformerSingleStep/save_model/best_model.pth') 
-
+    e_time = time.time()
+    print(f'total time:{e_time - s_time}')
     # # 恢复模型
     # new_model = model = TransformerModel()        
     # # 将model中的参数加载到new_model中            
