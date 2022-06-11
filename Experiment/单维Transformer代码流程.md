@@ -989,7 +989,7 @@ print('|epoch{:3d}|{:5d}/{:5d} batches | '
 
 训练完成后，需要可视化loss，每10个epoch一次
 
-- 使用划分的验证集来计算，一共是**203 - 100 - 1 = 102**个数据**(102,2,100)**
+- 使用划分的测试集来计算，一共是**203 - 100 - 1 = 102**个数据**(102,2,100)**
 
 ```bash
 tensor([
@@ -1018,13 +1018,13 @@ tensor([[[-0.5739]],
         [[-0.6140]]], device='cuda:0')
 ```
 
-计算整个batch（即验证集的一个epoch）的total_oss
+计算整个batch（即测试集的一个epoch）的total_oss
 
 ```python
 total_loss += criterion(output, target).item()
 ```
 
-拼接验证集的网络输出和labe
+拼接测试集的网络输出和labe
 
 - 最后两者都是**(101)**，即101个batch的数据的输出和label
 
@@ -1100,7 +1100,7 @@ total_loss / len(data_source)
 
 ## data
 
-预测的数据输入是sample划分的验证集
+预测的数据输入是sample划分的测试集
 
 ```python
 test_data = amplitude[sample:]
@@ -1111,7 +1111,7 @@ data, _ = get_batch(data_source, 0, 1)
 
 **batch size = 1**，所以最开始拿到的数据为**(1,2,100)**，然后切分后变成输入**(100,1,1)**
 
-即验证集开始，用前100个数据往后预测
+即测试集开始，用前100个数据往后预测
 
 - **个人理解因为训练是按input window = 100来训练的**
 
