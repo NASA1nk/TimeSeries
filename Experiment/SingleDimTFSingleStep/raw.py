@@ -3,23 +3,154 @@ import sys
 import time
 import math
 import pandas as pd
-from pandas import read_csv
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-from sklearn.preprocessing import MinMaxScaler
-# 测训练过程可视化
-from torch.utils.tensorboard import SummaryWriter
 from get_data import get_data, get_batch
 from embed import PositionalEncoding
-
+from models import TransformerModel
+# 测训练过程可视化
+from torch.utils.tensorboard import SummaryWriter
 
 sys.path.insert(0,os.getcwd())
 
-
 torch.manual_seed(42)
 np.random.seed(42)
+
+input_window = 100
+output_window = 1
+
+torch.cuda.set_device(0)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+# 位置编码,得到token的绝对位置信息和相对位置信息
+# 构造一个跟输入embedding维度一样的矩阵,然后跟输入embedding相加得到multi-head attention的输入
+
+# 无学习参数的位置编码
+class PositionalEncoding(nn.Module):
+
+    # d_model表示向量维度，max_len表示最大长度为5000，一般是200
+    def __init__(self, d_model, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        # zeros()生成二维矩阵pe(5000*250)，len行，d_model列，即5000个维度为250的行向量
+        pe = torch.zeros(max_len, d_model)
+
+        # arrange()生成一维矩阵pos(5000)，即5000个数(维度为5000的一个行向量)
+        # unsqueeze()用于在指定位置增加维度，如(0，1，2)三维，返回的tensor与输入的tensor共享内存，即改变其中一个的内容也会改变另一个
+        # 1即表示在第二个维度处增加，即列方向上增加一个维度，维度为5000的一个行向量变成了5000个维度为1的行向量，pos变成了二维矩阵(5000*1)
+        # pos这5000个一维向量就构成一列，计算位置信息来依次填充pe的每一个奇偶列
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        # 2是arange()中的步长参数，位置编码计算公式 e^(2i*-log10000/d_model)
+        div_term = torch.exp(torch.arange(
+            0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        # 填充pe矩阵，偶数列正弦编码，奇数列余弦编码
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+
+        # 0表示在第一个维度处增加一个维度，则二维矩阵pe(5000*250)变成了三维矩阵(1*5000*250)
+        # 第一个维度用于接受batch_size参数，表示第几个batch
+        # transpose(0,1)用于对矩阵进行转置，转置0维和1维，将(1*5000*250)变成(5000*1*250)
+        # 即位置编码三维矩阵pe最终是5000个，每个250维的行向量组成
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        # pe.requires_grad = False
+
+        # pytorch一般情况下将网络中的参数保存成OrderedDict形式
+        # 网络参数包括2种，一种是模型中各种module含的参数，即nn.Parameter，也可以在网络中定义其他的nn.Parameter参数，另外一种是buffer
+        # nn.Parameter会在每次optim.step会得到更新（即梯度更新），buffer则不会被更新（不会有梯度传播给它），但是能被模型的state_dict记录下来，buffer的更新在forward中
+
+        # 将pe存到内存中的一个常量(映射)，模型保存和加载的时候可以写入和读出，可以在forward()中使用
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        """
+            前向传播,将embedding后的输入加上position encoding
+            x=(S,N,E),S是source sequence length, N是batch size,E是feature number
+            即(source_sequence_length, batch_size, d_model)
+        """
+
+        return x + self.pe[:x.size(0), :]
+
+
+def create_inout_sequences(input_data, tw):
+    """
+        调用：train_sequence = create_inout_sequences(train_data, input_window)
+        处理原始数据集得到模型的训练集，并转换为tensor
+        每次从数据集中取出目标窗口(tw)长度的数据：(i,i+100)部分是输入，(i+1,i+100+1)部分是输出，即监督学习的对应的label
+        最终得到训练集[ ([0-100],[1-101]), ([1-101],[2-102]), ..., ([1899-1999],[1900-2000]) ]，共1900个数据
+
+    Args:
+        input_data: 原始数据，即train_data
+        tw: 输入窗口，即input_window = 100
+    """
+    inout_seq = []
+    L = len(input_data)
+    for i in range(L-tw):
+        train_seq = input_data[i:i+tw]
+        train_label = input_data[i+output_window:i+tw+output_window]
+        inout_seq.append((train_seq, train_label))
+    # 转换成tensor
+    return torch.FloatTensor(inout_seq)
+
+
+def get_data(path):
+    """
+        导入CSV数据，对数据做归一化处理,提升模型的收敛速度,提升模型的精度
+        初始化scaler在(-1,1)之间,然后使用scaler归一化数据，amplitude指序列振幅
+        根据sample将数据划分为数据集和测试集，调用create_inout_sequences()将其转换为tensor
+    """
+
+    # header=0，使用数据文件的第一行作为列名称，将第一列作为索引
+    df = pd.read_csv(path, header=0, index_col=0, parse_dates=True, squeeze=True)
+    # series = df.to_numpy()
+    # 通过df.loc来限制行列
+    series = df['value'].to_numpy()
+    scaler = MinMaxScaler(feature_range=(-1, 1))
+    # reshape()更改数据的行列数，(-1, 1)将df变为一列 (2203,1)，归一化后再(-1)变为一行 (2203,)
+    # amplitude = scaler.fit_transform(df.to_numpy().reshape(-1, 1)).reshape(-1)
+    amplitude = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
+    # 反归一化：reamplitude = scaler.inverse_transform(amplitude.reshape(-1, 1)).reshape(-1)
+
+    # # 多维数据
+    # data = df.loc['col1','col2']
+    # series = df.to_numpy()
+    # amplitude = scaler.fit_transform(series)
+
+    sample = 100000
+    train_data = amplitude[:sample]
+    test_data = amplitude[sample:]
+
+    # view(-1)变成一行
+    # train_tensor = torch.FloatTensor(train_data).view(-1)
+    # test_data = torch.FloatTensor(test_data).view(-1)
+    train_sequence = create_inout_sequences(train_data, input_window)
+    # (1900,2,100)
+    train_sequence = train_sequence[:-output_window]
+    test_data = create_inout_sequences(test_data, input_window)
+    test_data = test_data[:-output_window]
+
+    # 把tensor移动到GPU上运行
+    return train_sequence.to(device), test_data.to(device)
+
+
+def get_batch(source, i, batch_size):
+    """
+        调用：data, targets = get_batch(train_data, i, batch_size)
+        把源数据分为长度为batch_size的块，生成模型训练的输入和输入数据
+    """
+    seq_len = min(batch_size, len(source) - 1 - i)
+    # 每个batch的数据
+    data = source[i:i+seq_len]
+    # torch.stack(inputs, dim=?)→Tensor，对inputs(多个tensor)沿指定维度dim拼接，返回一维的tensor
+    # 即source = [([0...100],[1...101]), ([1...101],[2...102])...]，取出item[0]拼接,即train_seq = [[0...100],[1...101]...]
+    # torch.chunk(tensor, chunk_num, dim)将tensor在指定维度上(0行,1列)分为n块,返回一个tensor list,是一个tuple
+    # 即将拼接后的source按每一列划分成一个tensor tuple
+    input = torch.stack(torch.stack([item[0]
+                        for item in data]).chunk(input_window, 1))
+    target = torch.stack(torch.stack([item[1]
+                         for item in data]).chunk(input_window, 1))
+    return input, target
 
 
 # torch.nn.Module是所有NN的基类
@@ -94,6 +225,10 @@ class TransformerModel(nn.Module):
         mask = mask.float().masked_fill(mask == 0, float(
             '-inf')).masked_fill(mask == 1, float(0.0))
         return mask
+
+
+
+
 
 
 # train_data = create_inout_sequences(train_data,input_window)的[:-output_window]部分
@@ -287,53 +422,4 @@ if __name__ == "__main__":
     torch.save(best_model.state_dict(), f'./Experiment/TransformerSingleStep/save_model/best_model.pth') 
     e_time = time.time()
     print(f'total time:{e_time - s_time}')
-    # # 恢复模型
-    # new_model = model = TransformerModel()        
-    # # 将model中的参数加载到new_model中            
-    # new_model.load_state_dict(torch.load(PATH))   
-
-
-    # 训练
-    # for epoch in range(epoch_nums):
-    #     model.train()
-    #     for bach_idx, (features, targets) in enumerate(train_loader):
-    #         optimizer.zero_grad()
-    #         features, targets = features.view(-1,28*28).to(device), target.to(device)
-    #         output = model(features)
-    #         loss = criterion(output, targets)
-    #         loss.backward()
-    #         torch.nn.utils.clip_grad_norm_(model.parameters(), 0.7)
-    #         optimizer.step()
-    #         total_loss += loss.cpu().item() * len(features)
-    #         if not batch_idx % 50:
-    #             print ('Epoch: %03d/%03d | Batch %03d/%03d | loss: %.4f' %(
-    #                                                                     epoch+1, 
-    #                                                                     epoch_nums, 
-    #                                                                     batch_idx, 
-    #                                                                     len(train_loader), 
-    #                                                                     loss.item()))
-
-    # 测试
-    # model.eval()
-    # preds = []
-    # # test dataset
-    # for x in test_set:
-    #     x = x.to(device)
-    #     with torch.no_grad():
-    #         pred = model(x)
-    #         # collect predictio
-    #         preds.append(pred.cpu())
-
-    # # 保存
-    # state = {
-    #     'epoch' : epoch + 1,                    # 当前的迭代次数
-    #     'state_dict' : model.state_dict(),      # 模型参数
-    #     'optimizer' : optimizer.state_dict()    # 优化器参数
-    # }
-    # torch.save(state, f'./checkpoint/checkpoint_{epoch}.pth.tar')     #将state中的信息保存到checkpoint.pth.tar
-    # #Pytorch 约定使用.tar格式来保存这些检查点
-    # # 恢复训练
-    # checkpoint = torch.load(f'./checkpoint/checkpoint_{epoch}.pth.tar')
-    # epoch = checkpoint['epoch']
-    # model.load_state_dict(checkpoint['state_dict'])
-    # optimizer.load_state_dict(checkpoint['optimizer'])
+    
