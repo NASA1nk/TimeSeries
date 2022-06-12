@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-
+from embed import PositionalEncoding
 
 # torch.nn.Module是所有NN的基类
 class TransformerModel(nn.Module):
