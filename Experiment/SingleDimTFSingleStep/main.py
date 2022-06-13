@@ -105,19 +105,27 @@ def plot_loss(eval_model, val_data, scaler):
             # 使用view(-1)来改变output的形状
             predict = torch.cat((predict, output[-1].view(-1).cpu()), 0)
             ground_truth = torch.cat((ground_truth, targets[-1].view(-1).cpu()), 0)
-    # 恢复数据
-    # predict = scaler.inverse_transform(predict)
-    # ground_truth = scaler.inverse_transform(ground_truth)
+    # # 画图
+    # fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    # fig.patch.set_facecolor('white')
+    # # 红色是模型生成的预测值，蓝色是label，绿色是差值diff，即每个batch的
+    # ax.plot(predict, c='red', label='predict')
+    # ax.plot(ground_truth, c='blue', label='ground_truth')
+    # ax.plot(predict-ground_truth, color="green", label="diff")
+    # ax.legend() 
+    # plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/Epoch_{epoch}.png')
 
-    # 画图
+    # 恢复数据
+    predict = scaler.inverse_transform(predict.reshape(-1,1)).reshape(-1)
+    ground_truth = scaler.inverse_transform(ground_truth.reshape(-1,1)).reshape(-1)
     fig, ax = plt.subplots(1, 1, figsize=(10, 6))
     fig.patch.set_facecolor('white')
-    # 红色是模型生成的预测值，蓝色是label，绿色是差值diff，即每个batch的
     ax.plot(predict, c='red', label='predict')
     ax.plot(ground_truth, c='blue', label='ground_truth')
     ax.plot(predict-ground_truth, color="green", label="diff")
     ax.legend() 
-    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/Epoch_{epoch}.png')
+    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/normal_Epoch_{epoch}.png')
+
     # 返回验证集所有数据的平均MSEloss
     return total_loss / i
 
@@ -143,7 +151,17 @@ def predict(test_model, test_data, steps, scaler):
     ax.plot(data, c='red', linestyle='-.', label='predict')
     ax.plot(ground_truth, c='blue', label='ground_truth')
     ax.legend()
-    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/predict_{steps}.png')
+    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/predict_{steps}_{epoch}.png')
+
+    # # 恢复数据
+    # data = scaler.inverse_transform(data.reshape(-1,1)).reshape(-1)
+    # ground_truth = scaler.inverse_transform(ground_truth.reshape(-1,1)).reshape(-1)
+    # fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    # fig.patch.set_facecolor('white')
+    # ax.plot(data, c='red', linestyle='-.', label='predict')
+    # ax.plot(ground_truth, c='blue', label='ground_truth')
+    # ax.legend()
+    # plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/predict_normal_{steps}_{epoch}.png')
 
 
 if __name__ == "__main__":
@@ -162,7 +180,7 @@ if __name__ == "__main__":
     train_data, val_data = train_data.to(device), val_data.to(device)
     batch_size = 32
     # 初始化模型（实例化网络），然后迁移到gpu上
-    feature = 256
+    feature = 512
     layers = 1
     model = TransformerModel(feature_size=feature, num_layers=layers).to(device)
     # 均方损失函数：nn.MSELoss() = (x-y)^2/n，逐元素运算

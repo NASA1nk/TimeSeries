@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 # 生成时间序列索引
 def get_init_df():
-    date_rng = pd.date_range(start="2020-06-01", end="2022-06-01", freq="D")
+    date_rng = pd.date_range(start="2021-06-01", end="2022-06-01", freq="H")
     # 时间戳
     dataframe = pd.DataFrame(date_rng, columns=["timestamp"])
     # 行数索引
@@ -122,11 +122,13 @@ if __name__ == "__main__":
 
     # 多次生成，并合并数据
     # 显示进度条
-    for _ in tqdm(range(20000)):
-        df = generate_df()
-        # fig = plt.figure()
-        # plt.plot(df[-120:]["index"], df[-120:]["value"])
-        # plt.show()
-        dataframes.append(df)
+    # for _ in tqdm(range(20000)):
+    #     df = generate_df()
+    #     # fig = plt.figure()
+    #     # plt.plot(df[-120:]["index"], df[-120:]["value"])
+    #     # plt.show()
+    #     dataframes.append(df)
+    df = generate_df()
+    dataframes.append(df)
     all_data = pd.concat(dataframes, ignore_index=True)
     all_data.to_csv("/home/yinke/TimeSeries/Experiment/data/generate_time_data.csv", index=False)
