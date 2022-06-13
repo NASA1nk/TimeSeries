@@ -65,38 +65,38 @@ def train(train_data, batch_size):
     
 
 # 使用验证集来评估每个epoch训练后的模型
-def evaluate(test_model, test_data, batch_size):
-    # 设置为evaluation模式，不启用BatchNormalization和Dropout，将BatchNormalization和Dropout置为False（training的属性置为False）
-    test_model.eval()
+def evaluate(eval_model, val_data, batch_size):
+    # 设置为evaluation模式，不启用BatchNormalization和Dropout，将BatchNormalization和Dropout置为False（即training的属性置为False）
+    eval_model.eval()
     total_loss = 0.
     # 表明当前计算不需要反向传播
     with torch.no_grad():
-        for i in range(0, len(test_data)-1, batch_size):
-            data, targets = get_batch(test_data, i, batch_size)
+        for i in range(0, len(val_data)-1, batch_size):
+            data, targets = get_batch(val_data, i, batch_size)
             # 模型的评估和模型的训练逻辑基本相同，唯一的区别是评估只需要forward pass，不需要backward pass
-            output = test_model(data)
+            output = eval_model(data)
             # 没有反向传播，可以直接获取loss的标量item()
             loss = criterion(output, targets).cpu().item()
             # 以batch为单位计算的loss,所以乘以batch size(最后一次不足一个batch,所以是data[0]),最后计算平均
             total_loss += len(data[0]) * loss
     # 返回整个验证集的所有元素的平均MSEloss
-    avg_loss = total_loss / len(test_data)
+    avg_loss = total_loss / len(val_data)
     # 记录关键指标, 保存在本地
     writer.add_scalar('eval_loss', avg_loss, epoch)
     return avg_loss
 
 
 # 使用验证集可视化模型的loss
-def plot_loss(eval_model, test_data, scaler):
+def plot_loss(eval_model, val_data, scaler):
     eval_model.eval()
     total_loss = 0.
     predict = torch.Tensor(0)
     ground_truth = torch.Tensor(0)
     with torch.no_grad():
         # batch size = 1
-        for i in range(0, len(test_data)-1):
+        for i in range(0, len(val_data)-1):
             # 传入1
-            data, targets = get_batch(test_data, i, 1)
+            data, targets = get_batch(val_data, i, 1)
             output = eval_model(data)
             loss = criterion(output, targets).cpu().item()
             total_loss += loss
@@ -122,16 +122,17 @@ def plot_loss(eval_model, test_data, scaler):
     return total_loss / i
 
 
-# 使用验证集和best model来预测后n步
-def predict(val_model, val_data, steps, scaler):
-    val_model.eval()
+# 使用测试集和best model来预测后n步
+def predict(test_model, test_data, steps, scaler):
+    ground_truth, _ = test_data[:input_window+steps]
+    test_model.eval()
     # 取验证集的第一个数据,一步步往后预测
-    data, _ = get_batch(val_data, 0, 1)
-    # ground_truth, _ = get_batch(val_data, 0, input_window+steps)
+    test_data = create_targets_sequences(test_data, input_window)
+    data, _ = get_batch(test_data, 0, 1)
     with torch.no_grad():
-        for i in range(0, steps):
+        for i in range(steps):
             # 因为data是根据input_window划分来的,在第一次预测的时候,data[-input_window:]就是data,后续添加了预测结果后,只取input_window长度来预测
-            output = val_model(data[-input_window:])
+            output = test_model(data[-input_window:])
             # 拼接预测的结果,output[-1]即[0,100]的最后一个结果(1,1,1)，作为新的输入继续预测
             data = torch.cat((data, output[-1]))
     # 最后拼接的data即(100,1,100+steps)
@@ -139,7 +140,7 @@ def predict(val_model, val_data, steps, scaler):
     fig, ax = plt.subplots(1, 1, figsize=(10, 6))
     fig.patch.set_facecolor('white')
     ax.plot(data, c='red', linestyle='-.', label='predict')
-    # ax.plot(ground_truth, c='blue', label='ground_truth')
+    ax.plot(ground_truth, c='blue', label='ground_truth')
     ax.legend()
     plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/predict_{steps}.png')
 
@@ -147,7 +148,6 @@ def predict(val_model, val_data, steps, scaler):
 if __name__ == "__main__":
     # 目前512_1_32_0.005 loss最小
     s_time = time.time()
-    writer = SummaryWriter(comment='256_1_32_0005', flush_secs=10)
     torch.cuda.set_device(0)
     # 指定device，后续可以调用to(device)把Tensor迁移到device上
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -155,19 +155,19 @@ if __name__ == "__main__":
     input_window = 100
     # 预测窗口
     output_window = 1
-    batch_size = 32
-    epochs = 100
     path = './Experiment/data/2018AIOpsData/kpi_1.csv'
     # 获取训练集, 测试集和验证集，然后迁移到gpu上, scaler用于恢复原始数据
-    train_data, test_data, val_data, scaler = get_data(path)
-    train_data, test_data, val_data = train_data.to(device), test_data.to(device), val_data.to(device)
+    train_data, val_data, test_data, scaler = get_data(path)
+    train_data, val_data = train_data.to(device), val_data.to(device)
+    batch_size = 32
     # 初始化模型（实例化网络），然后迁移到gpu上
-    model = TransformerModel().to(device)
+    feature = 256
+    layers = 1
+    model = TransformerModel(feature_size=feature, num_layers=layers).to(device)
     # 均方损失函数：nn.MSELoss() = (x-y)^2/n，逐元素运算
     criterion = nn.MSELoss()
     # 学习率
     lr = 0.005
-    # lr = 0.01
     # 定义优化器，SGD随机梯度下降优化
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
     # # 梯度下降优化算法：Adam自适应学习算法
@@ -177,6 +177,8 @@ if __name__ == "__main__":
     # step_size参数表示每当scheduler.step()被调用step_size次，更新一次学习率，每次更新为当前学习率的0.95倍
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
 
+    writer = SummaryWriter(comment=f'{feature}_{layers}_{batch_size}', flush_secs=10)
+    epochs = 100
     best_loss = float("inf")
     best_model = None
     for epoch in range(1, epochs+1):
@@ -185,13 +187,13 @@ if __name__ == "__main__":
         train(train_data, batch_size)
         # 每10个epoch可视化一次测试集的loss
         if(epoch % 10 == 0):
-            loss = plot_loss(model, test_data, scaler)
+            loss = plot_loss(model, val_data, scaler)
         else:
-            loss = evaluate(model, test_data, batch_size)
+            loss = evaluate(model, val_data, batch_size)
         print('-' * 75)
-        print('| End of epoch {:2d} | avg_loss {:5.5f} | time: {:5.2f}s |'.format(epoch,
-                                                                                  loss,
-                                                                                  (time.time() - start_time)))
+        print('|   End of epoch {:2d}   |   avg_loss {:5.5f}   |   time: {:5.2f}s   |'.format(epoch,
+                                                                                              loss,
+                                                                                              (time.time() - start_time)))
         # 存储最优模型
         if loss < best_loss:
             best_loss = loss
@@ -201,7 +203,7 @@ if __name__ == "__main__":
     torch.save(best_model.state_dict(), f'./Experiment/SingleDimTFSingleStep/best_model.pth')
     # 预测
     steps = 10
-    predict(best_model, val_data, steps, scaler) 
+    predict(best_model, test_data, steps, scaler) 
     e_time = time.time()
     print(f'total time: {e_time - s_time},  best loss: {best_loss}')
 

@@ -59,18 +59,17 @@ def get_data(path):
     sample1 = 90000
     sample2 = 110000
     train_data = amplitude[:sample1]
-    test_data = amplitude[sample1:sample2]
-    val_data = amplitude[sample2:]
+    val_data = amplitude[sample1:sample2]
+    test_data = amplitude[sample2:]
 
     # view(-1)变成一行
     # train_sequence即(train_data-input_window, 2, input_window)
     train_data = create_targets_sequences(train_data, input_window)
     # 剔除output_window = 1个元素,即[[99899,99998], [99900, 99999]]
     # train_data = train_data[:-output_window]
-    test_data = create_targets_sequences(test_data, input_window)
-    # test_data = test_data[:-output_window]
     val_data = create_targets_sequences(val_data, input_window)
-    return train_data, test_data, val_data, scaler
+    # val_data = val_data[:-output_window]
+    return train_data, val_data, test_data, scaler
 
 
 def get_batch(source, i, batch_size):
