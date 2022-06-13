@@ -124,7 +124,7 @@ def plot_loss(eval_model, val_data, scaler):
     ax.plot(ground_truth, c='blue', label='ground_truth')
     ax.plot(predict-ground_truth, color="green", label="diff")
     ax.legend() 
-    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/normal_Epoch_{epoch}.png')
+    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/100_1_8_1_32/normal_Epoch_{epoch}.png')
 
     # 返回验证集所有数据的平均MSEloss
     return total_loss / i
@@ -151,7 +151,7 @@ def predict(test_model, test_data, steps, scaler):
     ax.plot(data, c='red', linestyle='-.', label='predict')
     ax.plot(ground_truth, c='blue', label='ground_truth')
     ax.legend()
-    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/predict_{steps}_{epoch}.png')
+    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/100_1_8_1_32/predict_{steps}_{epoch}.png')
 
     # # 恢复数据
     # data = scaler.inverse_transform(data.reshape(-1,1)).reshape(-1)
