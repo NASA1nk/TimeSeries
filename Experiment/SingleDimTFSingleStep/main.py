@@ -7,14 +7,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-from get_data import get_data, get_batch
+from get_data import create_targets_sequences, get_data, get_batch
 from models import TransformerModel
 # 测训练过程可视化
 from torch.utils.tensorboard import SummaryWriter
 
 sys.path.insert(0,os.getcwd())
-torch.manual_seed(42)
-np.random.seed(42)
+torch.manual_seed(0)
+np.random.seed(0)
 
 
 # 训练集:[[[0,99],[1,100]],[[1,100],[2,101]]...]
@@ -124,17 +124,18 @@ def plot_loss(eval_model, val_data, scaler):
 
 # 使用测试集和best model来预测后n步
 def predict(test_model, test_data, steps, scaler):
-    ground_truth, _ = test_data[:input_window+steps]
+    ground_truth = test_data[:input_window+steps]
     test_model.eval()
-    # 取验证集的第一个数据,一步步往后预测
     test_data = create_targets_sequences(test_data, input_window)
+    test_data = test_data.to(device)
+    # 取验证集的第一个数据,一步步往后预测
     data, _ = get_batch(test_data, 0, 1)
     with torch.no_grad():
         for i in range(steps):
             # 因为data是根据input_window划分来的,在第一次预测的时候,data[-input_window:]就是data,后续添加了预测结果后,只取input_window长度来预测
             output = test_model(data[-input_window:])
             # 拼接预测的结果,output[-1]即[0,100]的最后一个结果(1,1,1)，作为新的输入继续预测
-            data = torch.cat((data, output[-1]))
+            data = torch.cat((data, output[-1:]))
     # 最后拼接的data即(100,1,100+steps)
     data = data.cpu().view(-1)
     fig, ax = plt.subplots(1, 1, figsize=(10, 6))
@@ -148,14 +149,14 @@ def predict(test_model, test_data, steps, scaler):
 if __name__ == "__main__":
     # 目前512_1_32_0.005 loss最小
     s_time = time.time()
-    torch.cuda.set_device(0)
+    torch.cuda.set_device(1)
     # 指定device，后续可以调用to(device)把Tensor迁移到device上
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # 输入窗口
     input_window = 100
     # 预测窗口
     output_window = 1
-    path = './Experiment/data/2018AIOpsData/kpi_1.csv'
+    path = './Experiment/data/2018AIOpsData/kpi_normal_1.csv'
     # 获取训练集, 测试集和验证集，然后迁移到gpu上, scaler用于恢复原始数据
     train_data, val_data, test_data, scaler = get_data(path)
     train_data, val_data = train_data.to(device), val_data.to(device)
@@ -188,6 +189,7 @@ if __name__ == "__main__":
         # 每10个epoch可视化一次测试集的loss
         if(epoch % 10 == 0):
             loss = plot_loss(model, val_data, scaler)
+            predict(best_model, test_data, 10, scaler) 
         else:
             loss = evaluate(model, val_data, batch_size)
         print('-' * 75)
@@ -202,7 +204,7 @@ if __name__ == "__main__":
         scheduler.step()
     torch.save(best_model.state_dict(), f'./Experiment/SingleDimTFSingleStep/best_model.pth')
     # 预测
-    steps = 10
+    steps = 20
     predict(best_model, test_data, steps, scaler) 
     e_time = time.time()
     print(f'total time: {e_time - s_time},  best loss: {best_loss}')
