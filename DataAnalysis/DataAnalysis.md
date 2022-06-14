@@ -346,7 +346,10 @@ ipython
 from notebook.auth import passwd
 passwd()
 
-# 输入想要设置的登录JupyterLab的密码 然后复制输出密钥
+# 输入想要设置的登录JupyterLab的密码
+buaanlsde
+# 然后复制输出密钥
+'argon2:$argon2id$v=19$m=10240,t=10,p=8$YwRGNTqzZVoKUjAdli9mNQ$XFgo/vQBKGH0CfT1MrBSgLjQ5UkWOBb1ODUaENmKFFg'
 ```
 
 **生成配置文件**
@@ -446,8 +449,6 @@ nvcc -V
 ls /usr/src | grep nvidia
 ```
 
-
-
 ## Cuda
 
 选择cuda版本，下载安装
@@ -456,7 +457,15 @@ ls /usr/src | grep nvidia
 
 ![cuda安装](DataAnalysis.assets/cuda安装.png)
 
+## Pytorch
 
+[PyTorch](https://pytorch.org/)
+
+```bash
+pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu113
+```
+
+![安装pytorch](DataAnalysis.assets/安装pytorch.png)
 
 # Pandas
 

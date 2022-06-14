@@ -264,7 +264,7 @@ self.transformer_encoder = nn.TransformerEncoder(
 
 > 所以后面(20,100,1)要转换为(100,20,1)
 
-## Liner
+## Linear
 
 `torch.nn.Linear(in_features, out_features, bias=True, device=None, dtype=None)`
 
@@ -1063,18 +1063,18 @@ tensor([[[-0.6021]],
 
 # 评估
 
-每一个epoch结束后（所有数据都训练过一遍），传入验证集，评估实验结果
+每一个epoch结束后（所有数据都训练过一遍），传入测试集，评估实验结果
 
 评估和训练的流程是一样的，只是此时用训练好的参数，不在反向传播更新参数
 
 - `eval_model.eval()`
 - `with torch.no_grad()`
 
-> eval batch size如何设置？
+> 评估的batch size随意设置，跟训练没差别，这里选择跟训练的保持一致
 
 **计算整个数据集的平均loss**
 
-- 当**eval batch size = 64**时，每次获取的数据即**(100,64,1)**
+- 当**batch size = 64**时，每次获取的数据即**(100,64,1)**
 
 - 计算每次的loss
 
