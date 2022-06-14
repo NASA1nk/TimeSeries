@@ -227,11 +227,7 @@ if __name__ == "__main__":
     e_time = time.time()
     print(f'total time: {e_time - s_time},  best loss: {best_loss}')
 
-    # # 恢复模型
-    # new_model = TransformerModel()        
-    # # 将model中的参数加载到new_model中       
-    # path = './best_model.pth'     
-    # new_model.load_state_dict(torch.load(path))   
+     
 
     # 训练
     # for epoch in range(epoch_nums):
