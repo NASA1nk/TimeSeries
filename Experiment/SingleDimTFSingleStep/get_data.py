@@ -13,7 +13,26 @@ input_window = 100
 output_window = 1
 
 
-def create_targets_sequences(source_data, target_window):
+# [0:95,0,0,0,0,0] -> [0,99] 还是 [0,95,0,0,0,0,0] -> [5,105]
+def create_steps_sequences(source_data, input_window, output_window):
+    targets = []
+    L = len(source_data)
+    for i in range(L-input_window):
+        # 单维
+        # seq = source_data[i:i+input_window-output_window]
+        # train_seq = np.append(seq, [0] * output_window)
+        # train_label = source_data[i:i+input_window]
+        # # train_label = source_data[i+output_window:i+output_window+input_window]
+        # 多维
+        seq = source_data[i:i+input_window, :][:-output_window, :]
+        # seq = source_data[i:i+input_window-output_window, :]
+        train_seq = np.append(seq, np.zeros((output_window,10)), axis=0)
+        train_label = source_data[i:i+input_window,:]
+        targets.append((train_seq, train_label))
+    # 转换成tensor
+    return torch.FloatTensor(targets)
+
+def create_targets_sequences(source_data, input_window):
     """
         调用：train_sequence = create_targets_sequences(train_data, input_window)
         处理原始数据集得到模型的训练集, 并转换为tensor
@@ -26,11 +45,11 @@ def create_targets_sequences(source_data, target_window):
     """
     targets = []
     L = len(source_data)
-    for i in range(L-target_window):
+    for i in range(L-input_window):
         # [0,99]
-        train_seq = source_data[i:i+target_window]
+        train_seq = source_data[i:i+input_window]
         # [1,100]
-        train_label = source_data[i+output_window:i+target_window+output_window]
+        train_label = source_data[i+output_window:i+input_window+output_window]
         targets.append((train_seq, train_label))
     # 转换成tensor
     return torch.FloatTensor(targets)
@@ -48,7 +67,6 @@ def get_data(path):
     series = df['value'].to_numpy()
     scaler = MinMaxScaler(feature_range=(-1, 1))
     # reshape()更改数据的行列数，(-1, 1)将df变为一列 (2203,1)，归一化后再(-1)变为一行 (2203,)
-    # amplitude = scaler.fit_transform(df.to_numpy().reshape(-1, 1)).reshape(-1)
     amplitude = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
 
     # # 多维数据
