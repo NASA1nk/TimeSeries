@@ -124,7 +124,7 @@ def plot_loss(eval_model, val_data, scaler):
     ax.plot(ground_truth, c='blue', label='ground_truth')
     ax.plot(predict-ground_truth, color="green", label="diff")
     ax.legend() 
-    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/100_1_8_1_32/normal_Epoch_{epoch}.png')
+    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/100_1_512_1_64/normal_Epoch_{epoch}.png')
 
     # 返回验证集所有数据的平均MSEloss
     return total_loss / i
@@ -151,7 +151,7 @@ def predict(test_model, test_data, steps, scaler):
     ax.plot(data, c='red', linestyle='-.', label='predict')
     ax.plot(ground_truth, c='blue', label='ground_truth')
     ax.legend()
-    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/100_1_8_1_32/predict_{steps}_{epoch}.png')
+    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/100_1_512_1_64/predict_{steps}_{epoch}.png')
 
     # # 恢复数据
     # data = scaler.inverse_transform(data.reshape(-1,1)).reshape(-1)
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     # 获取训练集, 测试集和验证集，然后迁移到gpu上, scaler用于恢复原始数据
     train_data, val_data, test_data, scaler = get_data(path)
     train_data, val_data = train_data.to(device), val_data.to(device)
-    batch_size = 32
+    batch_size = 64
     # 初始化模型（实例化网络），然后迁移到gpu上
     feature = 512
     layers = 1
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     # 均方损失函数：nn.MSELoss() = (x-y)^2/n，逐元素运算
     criterion = nn.MSELoss()
     # 学习率
-    lr = 0.005
+    lr = 0.01
     # 定义优化器，SGD随机梯度下降优化
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
     # # 梯度下降优化算法：Adam自适应学习算法
@@ -220,9 +220,9 @@ if __name__ == "__main__":
             best_model = model
         # 对lr进行调整（通常用在一个epoch中，放在train()之后的）
         scheduler.step()
-    torch.save(best_model.state_dict(), f'./Experiment/SingleDimTFSingleStep/best_model.pth')
+    torch.save(best_model.state_dict(), f'./Experiment/SingleDimTFSingleStep/best_model/100_1_512_1_64.pth')
     # 预测
-    steps = 20
+    steps = 100
     predict(best_model, test_data, steps, scaler) 
     e_time = time.time()
     print(f'total time: {e_time - s_time},  best loss: {best_loss}')
