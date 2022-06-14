@@ -124,7 +124,7 @@ def plot_loss(eval_model, val_data, scaler):
     ax.plot(ground_truth, c='blue', label='ground_truth')
     ax.plot(predict-ground_truth, color="green", label="diff")
     ax.legend() 
-    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/100_1_8_1_32/normal_Epoch_{epoch}.png')
+    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/100_1_512_1_32_adam/normal_Epoch_{epoch}.png')
 
     # 返回验证集所有数据的平均MSEloss
     return total_loss / i
@@ -151,7 +151,7 @@ def predict(test_model, test_data, steps, scaler):
     ax.plot(data, c='red', linestyle='-.', label='predict')
     ax.plot(ground_truth, c='blue', label='ground_truth')
     ax.legend()
-    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/100_1_8_1_32/predict_{steps}_{epoch}.png')
+    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/100_1_512_1_32_adam/predict_{steps}_{epoch}.png')
 
     # # 恢复数据
     # data = scaler.inverse_transform(data.reshape(-1,1)).reshape(-1)
@@ -167,7 +167,7 @@ def predict(test_model, test_data, steps, scaler):
 if __name__ == "__main__":
     # 目前512_1_32_0.005 loss最小
     s_time = time.time()
-    torch.cuda.set_device(1)
+    torch.cuda.set_device(0)
     # 指定device，后续可以调用to(device)把Tensor迁移到device上
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # 输入窗口
@@ -188,9 +188,9 @@ if __name__ == "__main__":
     # 学习率
     lr = 0.005
     # 定义优化器，SGD随机梯度下降优化
-    optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=lr)
     # # 梯度下降优化算法：Adam自适应学习算法
-    # optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
     # torch.optim.lr_scheduler.StepLR(optimizer, step_size, gamma=0.1, last_epoch=-1)
     # step_size参数表示每当scheduler.step()被调用step_size次，更新一次学习率，每次更新为当前学习率的0.95倍
@@ -220,18 +220,11 @@ if __name__ == "__main__":
             best_model = model
         # 对lr进行调整（通常用在一个epoch中，放在train()之后的）
         scheduler.step()
-    torch.save(best_model.state_dict(), f'./Experiment/SingleDimTFSingleStep/best_model.pth')
-    # 预测
-    steps = 20
-    predict(best_model, test_data, steps, scaler) 
+    torch.save(best_model.state_dict(), f'./Experiment/SingleDimTFSingleStep/best_model/100_1_512_1_32_adam.pth')
     e_time = time.time()
     print(f'total time: {e_time - s_time},  best loss: {best_loss}')
 
-    # # 恢复模型
-    # new_model = TransformerModel()        
-    # # 将model中的参数加载到new_model中       
-    # path = './best_model.pth'     
-    # new_model.load_state_dict(torch.load(path))   
+     
 
     # 训练
     # for epoch in range(epoch_nums):
