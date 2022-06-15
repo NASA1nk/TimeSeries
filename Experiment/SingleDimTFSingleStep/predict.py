@@ -37,7 +37,7 @@ def predict(test_model, test_data, steps, scaler):
     ax.plot(data, c='red', linestyle='-.', label='predict')
     ax.plot(ground_truth, c='blue', label='ground_truth')
     ax.legend()
-    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/predict/val/100_1_512_1_32_{steps}.png')
+    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/predict/100_1_512_3_32_{steps}.png')
 
     # # 恢复数据
     # data = scaler.inverse_transform(data.reshape(-1,1)).reshape(-1)
@@ -52,16 +52,17 @@ def predict(test_model, test_data, steps, scaler):
 if __name__ == "__main__":
     torch.cuda.set_device(0)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     data_path = './Experiment/data/2018AIOpsData/kpi_normal_1.csv'
-    _, val_data, test_data, scaler = get_data(data_path)
-    model = TransformerModel(feature_size=512).to(device)
+    _, _, test_data, scaler = get_data(data_path)
+    feature = 512
+    layers = 3
+    model = TransformerModel(feature_size=feature, num_layers=layers).to(device)
     # 恢复模型, 将model中的参数加载到new_model中       
-    model_path = './Experiment/SingleDimTFSingleStep/best_model/100_1_512_1_32.pth'     
+    model_path = './Experiment/SingleDimTFSingleStep/best_model/100_1_512_3_32.pth'     
     model.load_state_dict(torch.load(model_path))  
     # 预测
     input_window = 100
     # steps = len(test_data) - input_window
     # steps = 20
     for steps in tqdm(range(2, 100)):
-        predict(model, val_data, steps, scaler) 
+        predict(model, test_data, steps, scaler) 
