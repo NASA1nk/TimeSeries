@@ -20,6 +20,7 @@ input_window = 100
 output_window = 5
 batch_size = 32
 
+
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=5000):
         super(PositionalEncoding, self).__init__()       
@@ -31,6 +32,7 @@ class PositionalEncoding(nn.Module):
         pe = pe.unsqueeze(0).transpose(0, 1)
         # pe.requires_grad = False
         self.register_buffer('pe', pe)
+
     def forward(self, x):
         return x + self.pe[:x.size(0), :]
 
@@ -74,18 +76,18 @@ def create_inout_sequences(input_data, tw):
     inout_seq = []
     L = len(input_data)
     for i in range(L-tw):
-        train_seq = np.append(input_data[i:i+tw,:][:-output_window,:] , np.zeros((output_window,10)),axis=0)
+        seq = input_data[i:i+tw-output_window,:]
+        train_seq = np.append(seq, np.zeros((output_window,10)),axis=0)
         train_label = input_data[i:i+tw,:]
-        # print(train_seq.shape,train_label.shape)
-        #train_label = input_data[i+output_window:i+tw+output_window]
+        # train_label = input_data[i+output_window:i+tw+output_window]
         inout_seq.append((train_seq ,train_label))
     return torch.FloatTensor(inout_seq)
 
 
 def get_data(data):
     # time = np.arange(0, 400, 0.1)
-    # amplitude = np.sin(time) + np.sin(time*0.05) +np.sin(time*0.12) *np.random.normal(-0.2, 0.2, len(time))
-    # series = read_csv('daily-min-temperatures.csv', header=0, index_col=0, parse_dates=True, squeeze=True)
+    # amplitude = np.sin(time) + np.sin(time*0.05) + np.sin(time*0.12) * np.random.normal(-0.2, 0.2, len(time))
+    
     scaler = MinMaxScaler(feature_range=(-1, 1))
     data = data_.loc[
         (data_["date"] >= pd.Timestamp(date(2014, 1, 1))) & (data_["date"] <= pd.Timestamp(date(2014, 2, 10)))]
@@ -106,10 +108,15 @@ def get_data(data):
     return train_sequence.to(device),test_data.to(device),scaler
 
 
-def get_batch(source, i,batch_size):
+def get_batch(source, i, batch_size):
     seq_len = min(batch_size, len(source) - 1 - i)
     data = source[i:i+seq_len]    
-    input = torch.stack(torch.stack([item[0] for item in data]).chunk(input_window,1)).squeeze()# 1 is feature size
+    a = [item[0] for item in data]
+    b = torch.stack(a)
+    c = b.chunk(input_window,1)
+    d = torch.stack(c)
+    e = d.squeeze()
+    input = torch.stack(torch.stack([item[0] for item in data]).chunk(input_window,1)).squeeze()
     target = torch.stack(torch.stack([item[1] for item in data]).chunk(input_window,1)).squeeze()
     return input, target
 
@@ -211,7 +218,7 @@ def plot(eval_model, data_source,epoch,scaler):
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    data_ = pd.read_excel('../data/MultiTSData.xlsx', 'Sheet1', parse_dates=["date"])
+    data_ = pd.read_excel('./Experiment/data/MultiTSData.xlsx', 'Sheet1', parse_dates=["date"])
     train_data, val_data, scaler = get_data(data_)
     model = TransAm().to(device)
     criterion = nn.MSELoss()
