@@ -20,6 +20,7 @@ input_window = 100
 output_window = 5
 batch_size = 32
 
+
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=5000):
         super(PositionalEncoding, self).__init__()       
@@ -31,6 +32,7 @@ class PositionalEncoding(nn.Module):
         pe = pe.unsqueeze(0).transpose(0, 1)
         # pe.requires_grad = False
         self.register_buffer('pe', pe)
+
     def forward(self, x):
         return x + self.pe[:x.size(0), :]
 
@@ -84,8 +86,8 @@ def create_inout_sequences(input_data, tw):
 
 def get_data(data):
     # time = np.arange(0, 400, 0.1)
-    # amplitude = np.sin(time) + np.sin(time*0.05) +np.sin(time*0.12) *np.random.normal(-0.2, 0.2, len(time))
-    # series = read_csv('daily-min-temperatures.csv', header=0, index_col=0, parse_dates=True, squeeze=True)
+    # amplitude = np.sin(time) + np.sin(time*0.05) + np.sin(time*0.12) * np.random.normal(-0.2, 0.2, len(time))
+    
     scaler = MinMaxScaler(feature_range=(-1, 1))
     data = data_.loc[
         (data_["date"] >= pd.Timestamp(date(2014, 1, 1))) & (data_["date"] <= pd.Timestamp(date(2014, 2, 10)))]
@@ -115,8 +117,6 @@ def get_batch(source, i, batch_size):
     d = torch.stack(c)
     e = d.squeeze()
     input = torch.stack(torch.stack([item[0] for item in data]).chunk(input_window,1)).squeeze()
-    if e.all() == input.all():
-        print('ink')
     target = torch.stack(torch.stack([item[1] for item in data]).chunk(input_window,1)).squeeze()
     return input, target
 
