@@ -66,6 +66,7 @@ def get_data(path):
     # train_data = train_data[:-output_window]
     val_data = create_targets_sequences(val_data, input_window)
     # val_data = val_data[:-output_window]
+    test_data = create_targets_sequences(test_data, input_window)
     return train_data, val_data, test_data, scaler
 
 
@@ -86,3 +87,17 @@ def get_batch(source, i, batch_size):
     target = torch.stack(torch.stack([item[1]
                          for item in data]).chunk(input_window, 1))
     return input, target
+
+
+def get_test_data(path):
+    """
+        导入CSV数据, 对数据做归一化处理, 初始化scaler在(-1,1)之间,然后使用scaler归一化数据, amplitude指序列振幅
+        根据sample将数据划分为数据集和测试集, 调用create_targets_sequences处理输入输出, 并将其转换为tensor
+    """
+    df = pd.read_csv(path, header=0, index_col=0, parse_dates=True, squeeze=True)
+    series = df['value'].to_numpy()
+    scaler = MinMaxScaler(feature_range=(-1, 1))
+    amplitude = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
+    test_data = amplitude
+    test_data = create_targets_sequences(test_data, input_window)
+    return test_data, scaler

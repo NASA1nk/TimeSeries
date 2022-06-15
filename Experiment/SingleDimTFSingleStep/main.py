@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 from get_data import create_targets_sequences, get_data, get_batch
 from models import TransformerModel
+from predict import predict
 # 测训练过程可视化
 from torch.utils.tensorboard import SummaryWriter
 
@@ -96,6 +97,7 @@ def plot_loss(eval_model, val_data, scaler):
         # batch size = 1
         for i in range(0, len(val_data)-1):
             # 传入1
+            # [0.100] . [1.101] [-1:]
             data, targets = get_batch(val_data, i, 1)
             output = eval_model(data)
             loss = criterion(output, targets).cpu().item()
@@ -118,7 +120,7 @@ def plot_loss(eval_model, val_data, scaler):
     # 恢复数据
     predict = scaler.inverse_transform(predict.reshape(-1,1)).reshape(-1)
     ground_truth = scaler.inverse_transform(ground_truth.reshape(-1,1)).reshape(-1)
-    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    fig, ax = plt.subplots(1, 1, figsize=(40, 5))
     fig.patch.set_facecolor('white')
     ax.plot(predict, c='red', label='predict')
     ax.plot(ground_truth, c='blue', label='ground_truth')
@@ -128,40 +130,6 @@ def plot_loss(eval_model, val_data, scaler):
 
     # 返回验证集所有数据的平均MSEloss
     return total_loss / i
-
-
-# 使用测试集和best model来预测后n步
-def predict(test_model, test_data, steps, scaler):
-    ground_truth = test_data[:input_window+steps]
-    test_model.eval()
-    test_data = create_targets_sequences(test_data, input_window)
-    test_data = test_data.to(device)
-    # 取验证集的第一个数据,一步步往后预测
-    data, _ = get_batch(test_data, 0, 1)
-    with torch.no_grad():
-        for i in range(steps):
-            # 因为data是根据input_window划分来的,在第一次预测的时候,data[-input_window:]就是data,后续添加了预测结果后,只取input_window长度来预测
-            output = test_model(data[-input_window:])
-            # 拼接预测的结果,output[-1]即[0,100]的最后一个结果(1,1,1)，作为新的输入继续预测
-            data = torch.cat((data, output[-1:]))
-    # 最后拼接的data即(100,1,100+steps)
-    data = data.cpu().view(-1)
-    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
-    fig.patch.set_facecolor('white')
-    ax.plot(data, c='red', linestyle='-.', label='predict')
-    ax.plot(ground_truth, c='blue', label='ground_truth')
-    ax.legend()
-    plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/100_1_512_3_32/predict_{steps}_{epoch}.png')
-
-    # # 恢复数据
-    # data = scaler.inverse_transform(data.reshape(-1,1)).reshape(-1)
-    # ground_truth = scaler.inverse_transform(ground_truth.reshape(-1,1)).reshape(-1)
-    # fig, ax = plt.subplots(1, 1, figsize=(10, 6))
-    # fig.patch.set_facecolor('white')
-    # ax.plot(data, c='red', linestyle='-.', label='predict')
-    # ax.plot(ground_truth, c='blue', label='ground_truth')
-    # ax.legend()
-    # plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/predict_normal_{steps}_{epoch}.png')
 
 
 if __name__ == "__main__":
