@@ -4,6 +4,7 @@ import time
 import math
 import pandas as pd
 import numpy as np
+from datetime import date
 from matplotlib import pyplot
 import torch
 import torch.nn as nn
@@ -43,12 +44,6 @@ def get_data(path, input_window, output_window):
     # fit_transform要求数据形状
     # reshape()更改数据的行列数，(-1, 1)将df变为一列 (2203,1)，归一化后再(-1)变为一行 (2203,)
     amplitude = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
-
-    # # 多维数据
-    # data = df.loc['col1','col2']
-    # series = df.to_numpy()
-    # amplitude = scaler.fit_transform(series)
-
     sample1 = 90000
     sample2 = 110000
     train_data = amplitude[:sample1]

@@ -120,7 +120,7 @@ def plot_loss(eval_model, val_data, batch_size, scaler, input_window):
 if __name__ == "__main__":
     start_time = time.time()
     # 指定device，后续可以调用to(device)把Tensor迁移到device上
-    torch.cuda.set_device(0)
+    # torch.cuda.set_device(0)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # path = './Experiment/data/2018AIOpsData/kpi_normal_1.csv'
     path = '../data/2018AIOpsData/kpi_normal_1.csv'
