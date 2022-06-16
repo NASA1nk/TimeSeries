@@ -44,8 +44,8 @@ def get_data(path, input_window, output_window):
     # fit_transform要求数据形状
     # reshape()更改数据的行列数，(-1, 1)将df变为一列 (2203,1)，归一化后再(-1)变为一行 (2203,)
     amplitude = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
-    sample1 = 90000
-    sample2 = 110000
+    sample1 = df.shape[0]//10*7
+    sample2 = df.shape[0]//10*9
     train_data = amplitude[:sample1]
     val_data = amplitude[sample1:sample2]
     test_data = amplitude[sample2:]

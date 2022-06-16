@@ -122,10 +122,10 @@ if __name__ == "__main__":
     # 指定device，后续可以调用to(device)把Tensor迁移到device上
     # torch.cuda.set_device(0)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # path = './Experiment/data/2018AIOpsData/kpi_normal_1.csv'
-    path = '../data/2018AIOpsData/kpi_normal_1.csv'
+    path = './Experiment/data/2018AIOpsData/kpi_normal_1.csv'
+    # path = '../data/2018AIOpsData/kpi_normal_1.csv'
     # scaler用于恢复原始数据
-    input_window = 100
+    input_window = 50
     output_window = 1
     train_data, val_data, test_data, scaler = get_data(path, input_window, output_window)
     train_data, val_data = train_data.to(device), val_data.to(device)
