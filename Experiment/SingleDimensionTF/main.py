@@ -107,11 +107,11 @@ def plot_loss(eval_model, val_data, batch_size, scaler, input_window):
     ground_truth = scaler.inverse_transform(ground_truth.reshape(-1,1)).reshape(-1)
     fig, ax = plt.subplots(1, 1, figsize=(10, 6))
     fig.patch.set_facecolor('white')
-    ax.plot(predict, c='red', label='predict')
     ax.plot(ground_truth, c='blue', label='ground_truth')
+    ax.plot(predict, c='red', label='predict')
     ax.plot(predict-ground_truth, color="green", label="diff")
     ax.legend() 
-    plt.savefig(f'./Experiment/SingleDimensionTF/img/50_1_512_1_32/Epoch_{epoch}_loss.png')
+    plt.savefig(f'./img/100_1_512_3_64_adam/Epoch_{epoch}.png')
     # plt.savefig(f'./img/50_1_512_1_32/Epoch_{epoch}_loss.png')
     # 返回验证集所有数据的平均MSEloss
     return total_loss / i
@@ -122,22 +122,23 @@ if __name__ == "__main__":
     # 指定device，后续可以调用to(device)把Tensor迁移到device上
     # torch.cuda.set_device(0)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    path = './Experiment/data/2018AIOpsData/kpi_normal_1.csv'
-    # path = '../data/2018AIOpsData/kpi_normal_1.csv'
-    input_window = 50
+    # path = './Experiment/data/2018AIOpsData/kpi_normal_1.csv'
+    path = '../data/2018AIOpsData/kpi_normal_1.csv'
+    # input_window = 50
+    input_window = 100
     output_window = 1
     # scaler用于恢复原始数据
-    train_data, val_data, test_data, scaler = get_data(path, input_window, output_window)
+    train_data, val_data, _, scaler = get_data(path, input_window, output_window)
     train_data, val_data = train_data.to(device), val_data.to(device)
     batch_size = 64
     # 初始化模型
     feature = 512
-    layers = 1
+    layers = 3
     model = TransformerModel(feature_size=feature, num_layers=layers).to(device)
     # 均方损失函数
     criterion = nn.MSELoss()
     # 学习率
-    lr = 0.01
+    lr = 0.005
     # 定义优化器，SGD随机梯度下降优化
     # optimizer = torch.optim.SGD(model.parameters(), lr=lr)
     # # 梯度下降优化算法：Adam自适应学习算法
@@ -145,7 +146,7 @@ if __name__ == "__main__":
     # 每当scheduler.step()被调用step_size(=1)次，更新一次学习率，每次更新为当前学习率的0.95倍
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
     # 记录指标信息
-    writer = SummaryWriter(comment=f'{input_window}_{output_window}_{feature}_{layers}_{batch_size}', flush_secs=10)
+    writer = SummaryWriter(comment=f'{input_window}_{output_window}_{feature}_{layers}_{batch_size}_adam', flush_secs=10)
     epochs = 100
     best_loss = float("inf")
     best_model = None
@@ -168,8 +169,7 @@ if __name__ == "__main__":
         # 对lr进行调整（通常用在一个epoch中，放在train()之后的）
         scheduler.step()
     # 保存模型
-    torch.save(best_model.state_dict(), f'././Experiment/SingleDimensionTF/best_model/{input_window}_{output_window}_{feature}_{layers}_{batch_size}.pth')
-    # torch.save(best_model.state_dict(), f'./best_model/{input_window}_{output_window}_{feature}_{layers}_{batch_size}.pth')
+    torch.save(best_model.state_dict(), f'./best_model/{input_window}_{output_window}_{feature}_{layers}_{batch_size}_adam.pth')
     print(f'total time: {time.time() - start_time},  best loss: {best_loss}')
 
     # 训练
@@ -185,26 +185,18 @@ if __name__ == "__main__":
     #         optimizer.step()
     #         total_loss += loss.cpu().item() * len(features)
 
-    # 测试
-    # model.eval()
-    # preds = []
-    # for x in test_data:
-    #     x = x.to(device)
-    #     with torch.no_grad():
-    #         pred = model(x)
-    #         preds.append(pred.cpu())
-
-    # # 保存
+    # 保存
     # state = {
     #     'epoch' : epoch + 1,                    # 当前的迭代次数
     #     'state_dict' : model.state_dict(),      # 模型参数
     #     'optimizer' : optimizer.state_dict()    # 优化器参数
     # }
+
     # 将state中的信息保存到checkpoint.pth.tar
     # torch.save(state, f'./checkpoint/checkpoint_{epoch}.pth.tar')     
     
-    # #Pytorch使用.tar格式来保存这些检查点
-    # # 恢复训练
+    # Pytorch使用.tar格式来保存这些检查点
+    # 恢复训练
     # checkpoint = torch.load(f'./checkpoint/checkpoint_{epoch}.pth.tar')
     # epoch = checkpoint['epoch']
     # model.load_state_dict(checkpoint['state_dict'])

@@ -89,3 +89,15 @@ def get_batch(source, i, batch_size, input_window):
     target = torch.stack(torch.stack([item[1]
                          for item in data]).chunk(input_window, 1))
     return input, target
+
+if __name__ == "__main__":
+    input_window = 100
+    # input_window = 50
+    output_window = 1
+    data_path = '../data/2018AIOpsData/kpi_12.csv'
+    test_data, scaler = get_test_data(data_path, input_window, output_window)
+    fig, ax = plt.subplots(1, 1, figsize=(20, 5))
+    fig.patch.set_facecolor('white')
+    ax.plot(test_data, c='red', label='ground_truth')
+    ax.legend() 
+    plt.savefig('./img/ground_truth.png')
