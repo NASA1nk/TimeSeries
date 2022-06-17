@@ -61,6 +61,19 @@ def get_data(path, input_window, output_window):
     return train_data, val_data, test_data, scaler
 
 
+def get_test_data(path, input_window, output_window):
+    """
+    获取新数据全部作为测试集
+    """
+    df = pd.read_csv(path, header=0, index_col=0, parse_dates=True, squeeze=True)
+    series = df['value'].to_numpy()
+    scaler = MinMaxScaler(feature_range=(-1, 1))
+    amplitude = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
+    amplitude = amplitude[:1000]
+    test_data = create_targets_sequences(amplitude, input_window, output_window)
+    return test_data, scaler
+
+
 def get_batch(source, i, batch_size, input_window):
     """
         调用：data, targets = get_batch(train_data, i, batch_size)
@@ -76,15 +89,3 @@ def get_batch(source, i, batch_size, input_window):
     target = torch.stack(torch.stack([item[1]
                          for item in data]).chunk(input_window, 1))
     return input, target
-
-
-def get_test_data(path, input_window):
-    """
-    获取新数据全部作为测试集
-    """
-    df = pd.read_csv(path, header=0, index_col=0, parse_dates=True, squeeze=True)
-    series = df['value'].to_numpy()
-    scaler = MinMaxScaler(feature_range=(-1, 1))
-    amplitude = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
-    test_data = create_targets_sequences(amplitude, input_window)
-    return test_data, scaler

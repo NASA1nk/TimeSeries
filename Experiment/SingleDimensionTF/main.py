@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 from get_data import get_data, get_batch
 from models import TransformerModel
-from predict import predict
+from test import plot_diff
 # 测训练过程可视化
 from torch.utils.tensorboard import SummaryWriter
 
@@ -111,8 +111,8 @@ def plot_loss(eval_model, val_data, batch_size, scaler, input_window):
     ax.plot(ground_truth, c='blue', label='ground_truth')
     ax.plot(predict-ground_truth, color="green", label="diff")
     ax.legend() 
-    # plt.savefig(f'./Experiment/SingleDimTFSingleStep/img/100_1_512_3_32/Epoch_{epoch}_loss.png')
-    plt.savefig(f'./img/100_1_512_3_32/Epoch_{epoch}_loss.png')
+    plt.savefig(f'./Experiment/SingleDimensionTF/img/50_1_512_1_32/Epoch_{epoch}_loss.png')
+    # plt.savefig(f'./img/50_1_512_1_32/Epoch_{epoch}_loss.png')
     # 返回验证集所有数据的平均MSEloss
     return total_loss / i
 
@@ -124,12 +124,12 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     path = './Experiment/data/2018AIOpsData/kpi_normal_1.csv'
     # path = '../data/2018AIOpsData/kpi_normal_1.csv'
-    # scaler用于恢复原始数据
     input_window = 50
     output_window = 1
+    # scaler用于恢复原始数据
     train_data, val_data, test_data, scaler = get_data(path, input_window, output_window)
     train_data, val_data = train_data.to(device), val_data.to(device)
-    batch_size = 32
+    batch_size = 64
     # 初始化模型
     feature = 512
     layers = 1
@@ -137,15 +137,15 @@ if __name__ == "__main__":
     # 均方损失函数
     criterion = nn.MSELoss()
     # 学习率
-    lr = 0.005
+    lr = 0.01
     # 定义优化器，SGD随机梯度下降优化
-    optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=lr)
     # # 梯度下降优化算法：Adam自适应学习算法
-    # optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     # 每当scheduler.step()被调用step_size(=1)次，更新一次学习率，每次更新为当前学习率的0.95倍
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
     # 记录指标信息
-    writer = SummaryWriter(comment=f'{feature}_{layers}_{batch_size}', flush_secs=10)
+    writer = SummaryWriter(comment=f'{input_window}_{output_window}_{feature}_{layers}_{batch_size}', flush_secs=10)
     epochs = 100
     best_loss = float("inf")
     best_model = None
@@ -155,7 +155,6 @@ if __name__ == "__main__":
         # 每10个epoch可视化一次测试集的loss
         if(epoch % 10 == 0):
             loss = plot_loss(model, val_data, batch_size, scaler, input_window)
-            predict(best_model, test_data, 10, scaler) 
         else:
             loss = evaluate(model, val_data, batch_size, input_window)
         print('-' * 75)
@@ -169,7 +168,8 @@ if __name__ == "__main__":
         # 对lr进行调整（通常用在一个epoch中，放在train()之后的）
         scheduler.step()
     # 保存模型
-    torch.save(best_model.state_dict(), f'./best_model/{input_window}_{output_window}_{feature}_{layers}_{batch_size}.pth')
+    torch.save(best_model.state_dict(), f'././Experiment/SingleDimensionTF/best_model/{input_window}_{output_window}_{feature}_{layers}_{batch_size}.pth')
+    # torch.save(best_model.state_dict(), f'./best_model/{input_window}_{output_window}_{feature}_{layers}_{batch_size}.pth')
     print(f'total time: {time.time() - start_time},  best loss: {best_loss}')
 
     # 训练
