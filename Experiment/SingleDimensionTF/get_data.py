@@ -23,7 +23,8 @@ def create_targets_sequences(source_data, input_window, output_window):
     """
     targets = []
     L = len(source_data)
-    for i in range(L-input_window):
+    # for _, i in enumerate(range(0, L - input_window + 1 - output_window, output_window)):
+    for i in range(L - input_window + 1 - output_window):
         train_seq = source_data[i:i+input_window]
         train_label = source_data[i+output_window:i+input_window+output_window]
         targets.append((train_seq, train_label))
