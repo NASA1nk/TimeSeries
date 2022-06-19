@@ -67,7 +67,7 @@ def evaluate(eval_model, data_source):
                 total_loss += len(data[0])* criterion(output[-output_window:], targets[-output_window:]).cpu().item()            
     return total_loss / len(data_source)
 
-def plot(eval_model, data_source,epoch,scaler):
+def plot(eval_model, data_source, epoch, scaler):
     eval_model.eval() 
     total_loss = 0.
     test_result = torch.Tensor(0)    
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.98)
     best_val_loss = float("inf")
-    epochs = 20
+    epochs = 100
     best_model = None
     for epoch in range(1, epochs + 1):
         epoch_start_time = time.time()

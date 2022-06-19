@@ -2,22 +2,11 @@ import torch
 import torch.nn as nn
 from embed import PositionalEncoding
 
+
 # torch.nn.Module是所有NN的基类
 class TransformerModel(nn.Module):
     # 定义模型网络结构
     def __init__(self, feature_size=256, num_layers=1, dropout=0.1, col_num=1):
-        """
-        编码器Encoder，只有一层encoder层
-        encoder层:10个头(默认8个)，dropout=0.1(默认),FNN默认维度2048，激活函数默认是ReLU
-        torch.nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward=2048, dropout=0.1, activation='relu')
-        解码器Decoder，使用全连接层代替了Decoder， 可以用Transformer的Decoder试试效果
-
-        Args:
-            feature_size (int, optional): 向量维度，默认d_model=250
-            num_layers (int, optional): encoder层数
-            dropout (float, optional): 防止过拟合，默认0.1的概率随机丢弃
-        """
-        # 获取父类nn.Module，然后调用父类的构造函数，初始化一些必要的变量和参数
         super(TransformerModel, self).__init__()
         self.model_type = 'Transformer'
         self.src_mask = None
