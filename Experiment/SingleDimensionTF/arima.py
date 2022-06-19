@@ -109,14 +109,13 @@ def arima(ts):
 
 
 if __name__ == "__main__":
-    path = '../data/arima/kpi_normal_1.csv'
+    path = '../data/2018AIOpsData/kpi_12.csv'
     df = pd.read_csv(path)
-    series = df['value'].to_numpy()
-    sample = df.shape[0]//10*7
-    series = series[:sample]
-    scaler = MinMaxScaler(feature_range=(-1, 1))
-    series = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
-    train_data = pd.Series(series)
+    # series = df['value'].to_numpy()
+    # scaler = MinMaxScaler(feature_range=(-1, 1))
+    # series = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
+    # train_data = pd.Series(series)
+    train_data = df['value'][:1000]
     ts_log = np.log(train_data)
     # draw_trend(train_data, 100)
     # ret = test_stationarity(train_data)
@@ -183,7 +182,7 @@ if __name__ == "__main__":
     ax.plot(train_data, color='red', label='Original')
     ax.set_title(f'MSE: {mse}, MAE: {mae}')
     ax.legend() 
-    plt.savefig(f'./img/arima/arima_predict_scaler.png')
+    plt.savefig(f'./img/arima/arima_predict_1000.png')
     
     f = plt.figure(figsize=(10, 6))
     f.patch.set_facecolor('white')
@@ -193,4 +192,4 @@ if __name__ == "__main__":
     ax = f.add_subplot(2, 1, 2)
     ax.plot(train_data, color='red', label='Original')
     ax.legend()
-    plt.savefig(f'./img/arima/arima_predict_scaler_1.png')
+    plt.savefig(f'./img/arima/arima_predict_1000_1.png')
