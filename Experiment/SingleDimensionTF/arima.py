@@ -111,11 +111,12 @@ def arima(ts):
 if __name__ == "__main__":
     path = '../data/arima/kpi_normal_1.csv'
     df = pd.read_csv(path)
-    series = df['value']
+    series = df['value'].to_numpy()
     sample = df.shape[0]//10*7
-    train_data = series[:sample]
+    series = series[:sample]
     scaler = MinMaxScaler(feature_range=(-1, 1))
-    train_data = scaler.fit_transform(train_data.reshape(-1, 1)).reshape(-1)
+    series = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
+    train_data = pd.Series(series)
     ts_log = np.log(train_data)
     # draw_trend(train_data, 100)
     # ret = test_stationarity(train_data)
