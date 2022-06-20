@@ -174,7 +174,7 @@ if __name__ == "__main__":
     
     # 预测
     test_data = test_data.to(device)
-    mse, mae = plot_diff(best_model, test_data, scaler, input_window)
+    mse, mae = plot_diff(best_model, test_data, scaler, input_window, output_window)
     name = '200_1_512_1_64_adam'
     print(f'{name}: {{mse: {mse}, mae: {mae}}}')
 

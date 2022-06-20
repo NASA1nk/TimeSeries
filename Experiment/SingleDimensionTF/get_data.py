@@ -31,6 +31,17 @@ def create_targets_sequences(source_data, input_window, output_window):
     return torch.FloatTensor(targets)
 
 
+def create_src_sequences(source_data, input_window, output_window):
+    targets = []
+    L = len(source_data)
+    # for _, i in enumerate(range(0, L - input_window + 1 - output_window, output_window)):
+    for i in range(L - input_window + 1 - output_window):
+        train_seq = source_data[i:i+input_window]
+        train_label = source_data[i+output_window:i+input_window+output_window]
+        targets.append((train_seq, train_label))
+    return torch.FloatTensor(targets)
+
+
 def get_data(path, input_window, output_window):
     """
         导入CSV数据, 对数据做归一化处理, 初始化scaler在(-1,1)之间,然后使用scaler归一化数据, amplitude指序列振幅
@@ -70,7 +81,7 @@ def get_test_data(path, input_window, output_window):
     series = df['value'].to_numpy()
     scaler = MinMaxScaler(feature_range=(-1, 1))
     amplitude = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
-    amplitude = amplitude[:1000]
+    # amplitude = amplitude[:1000]
     test_data = create_targets_sequences(amplitude, input_window, output_window)
     return test_data, scaler
 

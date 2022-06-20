@@ -9,8 +9,6 @@ import torch
 import torch.nn as nn
 from get_data import create_targets_sequences, get_data, get_batch, get_test_data
 from models import TransformerModel
-# 测训练过程可视化
-from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 sys.path.insert(0,os.getcwd())
@@ -40,7 +38,7 @@ def predict(test_model, test_data, input_window, output_window, steps, scaler):
     plt.savefig(f'./Experiment/SingleDimensionTF/img/predict_{steps}.png')
 
 
-def plot_diff(test_model, test_data, scaler, input_window):
+def plot_diff(test_model, test_data, scaler, input_window, output_window):
     test_model.eval()
     predict = torch.Tensor(0)
     ground_truth = torch.Tensor(0)
@@ -60,8 +58,6 @@ def plot_diff(test_model, test_data, scaler, input_window):
             mae += abs(diff)
             predict = torch.cat((predict, y), 0)
             ground_truth = torch.cat((ground_truth, _y), 0)
-            # 记录指标信息
-            # writer.add_scalar('test_diff', diff, i)
     mse = mse / i
     mae = mae / i
     # 记录超过p99的值，标记在图上
@@ -81,28 +77,27 @@ def plot_diff(test_model, test_data, scaler, input_window):
     ax.plot(predict, c='red', marker='o', markerfacecolor='black', markevery=marker, label='predict')
     # ax.plot(diff_list, c="green", label="diff")
     ax.legend() 
-    plt.savefig(f'./img/normal/{input_window}_{output_window}_{feature}_{layers}_32_adam_predict.png')
+    plt.savefig(f'./img/normal/{input_window}_{output_window}_{feature}_{layers}_64_adam_predict.png')
     return mse, mae
 
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # data_path = '../data/2018AIOpsData/kpi_normal_1.csv'
-    data_path = '../data/2018AIOpsData/kpi_12.csv'
+    data_path = '../data/2018AIOpsData/kpi_normal_1.csv'
+    # data_path = '../data/2018AIOpsData/kpi_12.csv'
     input_window = 200
     output_window = 1
-    test_data, scaler = get_test_data(data_path, input_window, output_window)
-    # _, _, test_data, scaler = get_data(data_path, input_window, output_window)
+    # test_data, scaler = get_test_data(data_path, input_window, output_window)
+    _, _, test_data, scaler = get_data(data_path, input_window, output_window)
     test_data = test_data.to(device)
     feature = 512
     layers = 1
     model = TransformerModel(feature_size=feature, num_layers=layers).to(device)
     # 恢复模型, 将model中的参数加载到new_model中       
-    model_path = './best_model/200_1_512_1_32_adam.pth' 
+    model_path = './best_model/200_1_512_1_64_adam.pth' 
     name = model_path.split('/')[-1][:-4]
-    # writer = SummaryWriter(comment=f'./loss/{name}_new_data', flush_secs=20)
     model.load_state_dict(torch.load(model_path, map_location=device))
-    mse, mae = plot_diff(model, test_data, scaler, input_window)
+    mse, mae = plot_diff(model, test_data, scaler, input_window, output_window)
     print(f'{name}: {{mse: {mse}, mae: {mae}}}')
 
     
