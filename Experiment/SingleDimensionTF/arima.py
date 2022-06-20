@@ -22,8 +22,8 @@ def draw_trend(ts, size):
     ax.plot(ts, c='blue', label='Original')
     ax.plot(rol_mean, c='red', label='Rolling Mean')
     ax.plot(rol_std, color="green", label="Rolling standard deviation")
-    ax.legend(loc='best') 
-    plt.savefig(f'./img/arima/arima_decompose_trend.png')
+    ax.legend() 
+    plt.savefig(f'./img/arima/arima_normal_trend.png')
 
 
 # Dickey-Fuller test
@@ -44,14 +44,15 @@ def draw_moving(ts, size):
     rol_mean = ts.rolling(window=size).mean()
     # 对size个数据进行加权移动平均
     rol_weighted_mean = pd.DataFrame.ewm(ts, span=size).mean()
-    # print(rol_weighted_mean)
-    fig, ax = plt.subplots(1, 1, figsize=(20, 5))
+    print(rol_mean)
+    print(rol_weighted_mean)
+    fig, ax = plt.subplots(1, 1, figsize=(10, 5))
     fig.patch.set_facecolor('white')
     ax.plot(ts, c='blue', label='Original')
     ax.plot(rol_mean, c='red', label='Rolling Mean')
     ax.plot(rol_weighted_mean.to_numpy(), color="green", label="Weighted Rolling Mean")
     ax.legend(loc='best') 
-    plt.savefig(f'./img/arima/arima_draw_moving.png')
+    plt.savefig(f'./img/arima/arima_draw_normal_moving.png')
 
 
 # 分解趋势, 季节, 随机
@@ -109,13 +110,17 @@ def arima(ts):
 
 
 if __name__ == "__main__":
-    path = '../data/2018AIOpsData/kpi_12.csv'
-    df = pd.read_csv(path)
+    path = '../data/2018AIOpsData/kpi_normal_1.csv'
+    df = pd.read_csv(path, header=0, index_col=0, parse_dates=True, squeeze=True)
     # series = df['value'].to_numpy()
-    # scaler = MinMaxScaler(feature_range=(-1, 1))
+    # scaler = MinMaxScaler(feature_range=(0, 1))
     # series = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
-    # train_data = pd.Series(series)
-    train_data = df['value'][:1000]
+    series = df['value']
+    sample = df.shape[0]//10*9
+    train_data = series[sample:]
+
+    # df = pd.read_csv(path)
+    # train_data = df['value'][:1000]
     ts_log = np.log(train_data)
     # draw_trend(train_data, 100)
     # ret = test_stationarity(train_data)
@@ -131,12 +136,22 @@ if __name__ == "__main__":
     # Critical Value (5%)           -2.861573e+00
     # Critical Value (10%)          -2.566788e+00
     # dtype: float64
+    
+    # normal
+    # Test Statistic                    -2.496380
+    # p-value                            0.116358
+    # #Lags Used                        38.000000
+    # Number of Observations Used    12345.000000
+    # Critical Value (1%)               -3.430880
+    # Critical Value (5%)               -2.861774
+    # Critical Value (10%)              -2.566895
+    # dtype: float64
     # print(ret)
 
-    # draw_moving(ts_log, 12)
+    # draw_moving(ts_log, 100)
 
-    # # 差分操作
-    # # 12阶差分
+    # 差分操作
+    # 12阶差分
     # diff_12 = ts_log.diff(12)
     # diff_12.dropna(inplace=True)
     # # 1阶差分
@@ -182,7 +197,7 @@ if __name__ == "__main__":
     ax.plot(train_data, color='red', label='Original')
     ax.set_title(f'MSE: {mse}, MAE: {mae}')
     ax.legend() 
-    plt.savefig(f'./img/arima/arima_predict_1000.png')
+    plt.savefig(f'./img/arima/arima_normal_predict.png')
     
     f = plt.figure(figsize=(10, 6))
     f.patch.set_facecolor('white')
@@ -192,4 +207,4 @@ if __name__ == "__main__":
     ax = f.add_subplot(2, 1, 2)
     ax.plot(train_data, color='red', label='Original')
     ax.legend()
-    plt.savefig(f'./img/arima/arima_predict_1000_1.png')
+    plt.savefig(f'./img/arima/arima_normal_predict_1.png')

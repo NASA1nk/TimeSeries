@@ -81,24 +81,25 @@ def plot_diff(test_model, test_data, scaler):
     ax.plot(predict, c='red', marker='o', markerfacecolor='black', markevery=marker, label='predict')
     # ax.plot(diff_list, c="green", label="diff")
     ax.legend() 
-    plt.savefig(f'./img/{input_window}_{output_window}_{feature}_{layers}_adam_predict.png')
+    plt.savefig(f'./img/normal/{input_window}_{output_window}_{feature}_{layers}_64_adam_predict.png')
     return mse, mae
 
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # data_path = '../data/2018AIOpsData/kpi_normal_1.csv'
-    data_path = '../data/2018AIOpsData/kpi_12.csv'
-    input_window = 100
-    # input_window = 50
+    data_path = '../data/2018AIOpsData/kpi_normal_1.csv'
+    # data_path = '../data/2018AIOpsData/kpi_12.csv'
+    # input_window = 100
+    input_window = 50
     output_window = 1
-    test_data, scaler = get_test_data(data_path, input_window, output_window)
+    # test_data, scaler = get_test_data(data_path, input_window, output_window)
+    _, _, test_data, scaler = get_data(data_path, input_window, output_window)
     test_data = test_data.to(device)
     feature = 512
-    layers = 3
+    layers = 1
     model = TransformerModel(feature_size=feature, num_layers=layers).to(device)
     # 恢复模型, 将model中的参数加载到new_model中       
-    model_path = './best_model/100_1_512_3_32_adam.pth' 
+    model_path = './best_model/50_1_512_1_64_adam.pth' 
     name = model_path.split('/')[-1][:-4]
     # writer = SummaryWriter(comment=f'./loss/{name}_new_data', flush_secs=20)
     model.load_state_dict(torch.load(model_path, map_location=device))
