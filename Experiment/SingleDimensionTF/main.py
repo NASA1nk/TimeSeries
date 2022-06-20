@@ -111,7 +111,7 @@ def plot_loss(eval_model, val_data, batch_size, scaler, input_window):
     ax.plot(predict, c='red', label='predict')
     ax.plot(predict-ground_truth, color="green", label="diff")
     ax.legend() 
-    plt.savefig(f'./img/100_1_512_2_32_adam/Epoch_{epoch}.png')
+    plt.savefig(f'./img/200_1_512_1_64_adam/Epoch_{epoch}.png')
     # plt.savefig(f'./img/50_1_512_1_32/Epoch_{epoch}_loss.png')
     # 返回验证集所有数据的平均MSEloss
     return total_loss / i
@@ -125,20 +125,20 @@ if __name__ == "__main__":
     # path = './Experiment/data/2018AIOpsData/kpi_normal_1.csv'
     path = '../data/2018AIOpsData/kpi_normal_1.csv'
     # input_window = 50
-    input_window = 100
+    input_window = 200
     output_window = 1
     # scaler用于恢复原始数据
-    train_data, val_data, _, scaler = get_data(path, input_window, output_window)
+    train_data, val_data, test_data, scaler = get_data(path, input_window, output_window)
     train_data, val_data = train_data.to(device), val_data.to(device)
-    batch_size = 32
+    batch_size = 64
     # 初始化模型
     feature = 512
-    layers = 2
+    layers = 1
     model = TransformerModel(feature_size=feature, num_layers=layers).to(device)
     # 均方损失函数
     criterion = nn.MSELoss()
     # 学习率
-    lr = 0.005
+    lr = 0.001
     # 定义优化器，SGD随机梯度下降优化
     # optimizer = torch.optim.SGD(model.parameters(), lr=lr)
     # # 梯度下降优化算法：Adam自适应学习算法
@@ -171,6 +171,12 @@ if __name__ == "__main__":
     # 保存模型
     torch.save(best_model.state_dict(), f'./best_model/{input_window}_{output_window}_{feature}_{layers}_{batch_size}_adam.pth')
     print(f'total time: {time.time() - start_time},  best loss: {best_loss}')
+    
+    # 预测
+    test_data = test_data.to(device)
+    mse, mae = plot_diff(best_model, test_data, scaler, input_window)
+    name = '200_1_512_1_64_adam'
+    print(f'{name}: {{mse: {mse}, mae: {mae}}}')
 
     # 训练
     # for epoch in range(epoch_nums):
