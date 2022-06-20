@@ -23,7 +23,6 @@ def create_targets_sequences(source_data, input_window, output_window):
     """
     targets = []
     L = len(source_data)
-    # for _, i in enumerate(range(0, L - input_window + 1 - output_window, output_window)):
     for i in range(L - input_window + 1 - output_window):
         train_seq = source_data[i:i+input_window]
         train_label = source_data[i+output_window:i+input_window+output_window]
@@ -31,11 +30,10 @@ def create_targets_sequences(source_data, input_window, output_window):
     return torch.FloatTensor(targets)
 
 
-def create_src_sequences(source_data, input_window, output_window):
+def create_targets_sequences_with_window(source_data, input_window, output_window):
     targets = []
     L = len(source_data)
-    # for _, i in enumerate(range(0, L - input_window + 1 - output_window, output_window)):
-    for i in range(L - input_window + 1 - output_window):
+    for _, i in enumerate(range(0, L - input_window + 1 - output_window, output_window)):
         train_seq = source_data[i:i+input_window]
         train_label = source_data[i+output_window:i+input_window+output_window]
         targets.append((train_seq, train_label))
@@ -62,14 +60,17 @@ def get_data(path, input_window, output_window):
     val_data = amplitude[sample1:sample2]
     test_data = amplitude[sample2:]
 
-    # view(-1)变成一行
-    # train_sequence即(train_data-input_window, 2, input_window)
-    train_data = create_targets_sequences(train_data, input_window, output_window)
-    # 剔除output_window = 1个元素,即[[99899,99998], [99900, 99999]]
-    # train_data = train_data[:-output_window]
-    val_data = create_targets_sequences(val_data, input_window, output_window)
-    # val_data = val_data[:-output_window]
-    test_data = create_targets_sequences(test_data, input_window, output_window)
+    if output_window == 1:
+        # train_sequence即(train_data-input_window, 2, input_window)
+        # 步长为1
+        train_data = create_targets_sequences(train_data, input_window, output_window)
+        val_data = create_targets_sequences(val_data, input_window, output_window)
+        test_data = create_targets_sequences(test_data, input_window, output_window)
+    else:
+        # 任意步长
+        train_data = create_targets_sequences_with_window(train_data, input_window, output_window)
+        val_data = create_targets_sequences_with_window(val_data, input_window, output_window)
+        test_data = create_targets_sequences_with_window(test_data, input_window, output_window)
     return train_data, val_data, test_data, scaler
 
 
@@ -81,8 +82,8 @@ def get_test_data(path, input_window, output_window):
     series = df['value'].to_numpy()
     scaler = MinMaxScaler(feature_range=(-1, 1))
     amplitude = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
-    # amplitude = amplitude[:1000]
-    test_data = create_targets_sequences(amplitude, input_window, output_window)
+    amplitude = amplitude[:1000]
+    test_data = create_targets_sequences_with_window(amplitude, input_window, output_window)
     return test_data, scaler
 
 

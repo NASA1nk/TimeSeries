@@ -46,18 +46,12 @@ def train(train_data, batch_size, input_window):
         log_interval = int(len(train_data) / batch_size / 5)
         if batch % log_interval == 0 and batch > 0:
             cur_loss = total_loss / log_interval
-            # 这部分轮训练花费的时间
+            # 这几轮训练花费的时间
             cost_time = time.time() - start_time
             # 第几个epoch，当前的batch数目/一个epoch的总batch数，学习率，训练花费时间，MSEloss
             print('-' * 75)
-            print('| epoch {:2d} | {:5d} / {:} batches | '
-                  'lr {:02.6f} | {:5.2f} ms | '
-                  'loss {:5.5f} |'.format(
-                                                    epoch, 
-                                                    batch, len(train_data) // batch_size,
-                                                    scheduler.get_last_lr()[0],
-                                                    cost_time / log_interval * 1000,
-                                                    cur_loss))
+            print('| epoch {:2d} | {:5d} / {:} batches | lr {:02.6f} | {:5.2f} ms | loss {:5.5f} |'.format(
+                  epoch, batch, len(train_data) // batch_size, scheduler.get_last_lr()[0], cost_time / log_interval * 1000, cur_loss))
             total_loss = 0
             start_time = time.time()
     avg_loss = avg_loss / len(train_data)
@@ -65,7 +59,7 @@ def train(train_data, batch_size, input_window):
     
 
 # 使用验证集来评估每个epoch训练后的模型
-def evaluate(eval_model, val_data, batch_size, input_window):
+def evaluate(eval_model, val_data, batch_size, input_window, output_window):
     # 设置为evaluation模式，不启用BatchNormalization和Dropout，将BatchNormalization和Dropout置为False（即training的属性置为False）
     eval_model.eval()
     total_loss = 0.
@@ -86,7 +80,7 @@ def evaluate(eval_model, val_data, batch_size, input_window):
 
 
 # 使用验证集可视化模型的loss
-def plot_loss(eval_model, val_data, batch_size, scaler, input_window):
+def plot_loss(eval_model, val_data, batch_size, scaler, input_window, output_window):
     eval_model.eval()
     total_loss = 0.
     predict = torch.Tensor(0)
@@ -111,7 +105,7 @@ def plot_loss(eval_model, val_data, batch_size, scaler, input_window):
     ax.plot(predict, c='red', label='predict')
     ax.plot(predict-ground_truth, color="green", label="diff")
     ax.legend() 
-    plt.savefig(f'./img/200_1_512_1_64_adam/Epoch_{epoch}.png')
+    plt.savefig(f'./img/5/200_Epoch_{epoch}.png')
     # plt.savefig(f'./img/50_1_512_1_32/Epoch_{epoch}_loss.png')
     # 返回验证集所有数据的平均MSEloss
     return total_loss / i
@@ -124,16 +118,16 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # path = './Experiment/data/2018AIOpsData/kpi_normal_1.csv'
     path = '../data/2018AIOpsData/kpi_normal_1.csv'
-    # input_window = 50
-    input_window = 200
-    output_window = 1
+    input_window = 100
+    output_window = 5
     # scaler用于恢复原始数据
     train_data, val_data, test_data, scaler = get_data(path, input_window, output_window)
     train_data, val_data = train_data.to(device), val_data.to(device)
-    batch_size = 64
+    batch_size = 32
     # 初始化模型
     feature = 512
     layers = 1
+    name = f'{input_window}_{output_window}_{feature}_{layers}_{batch_size}'
     model = TransformerModel(feature_size=feature, num_layers=layers).to(device)
     # 均方损失函数
     criterion = nn.MSELoss()
@@ -146,7 +140,7 @@ if __name__ == "__main__":
     # 每当scheduler.step()被调用step_size(=1)次，更新一次学习率，每次更新为当前学习率的0.95倍
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
     # 记录指标信息
-    writer = SummaryWriter(comment=f'{input_window}_{output_window}_{feature}_{layers}_{batch_size}_adam', flush_secs=10)
+    writer = SummaryWriter(comment=f'{name}', flush_secs=10)
     epochs = 100
     best_loss = float("inf")
     best_model = None
@@ -155,9 +149,9 @@ if __name__ == "__main__":
         train(train_data, batch_size, input_window)
         # 每10个epoch可视化一次测试集的loss
         if(epoch % 10 == 0):
-            loss = plot_loss(model, val_data, batch_size, scaler, input_window)
+            loss = plot_loss(model, val_data, batch_size, scaler, input_window, output_window)
         else:
-            loss = evaluate(model, val_data, batch_size, input_window)
+            loss = evaluate(model, val_data, batch_size, input_window, output_window)
         print('-' * 75)
         print('|   End of epoch {:2d}   |   avg_loss {:5.5f}   |   time: {:5.2f}s   |'.format(epoch,
                                                                                               loss,
@@ -169,14 +163,13 @@ if __name__ == "__main__":
         # 对lr进行调整（通常用在一个epoch中，放在train()之后的）
         scheduler.step()
     # 保存模型
-    torch.save(best_model.state_dict(), f'./best_model/{input_window}_{output_window}_{feature}_{layers}_{batch_size}_adam.pth')
+    torch.save(best_model.state_dict(), f'./best_model/{name}.pth')
     print(f'total time: {time.time() - start_time},  best loss: {best_loss}')
     
     # 预测
-    test_data = test_data.to(device)
-    mse, mae = plot_diff(best_model, test_data, scaler, input_window, output_window)
-    name = '200_1_512_1_64_adam'
-    print(f'{name}: {{mse: {mse}, mae: {mae}}}')
+    # test_data = test_data.to(device)
+    # mse, mae = plot_diff(best_model, test_data, scaler, input_window, output_window)
+    # print(f'{name}: {{mse: {mse}, mae: {mae}}}')
 
     # 训练
     # for epoch in range(epoch_nums):
