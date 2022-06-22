@@ -82,7 +82,7 @@ def get_test_data(path, input_window, output_window):
     series = df['value'].to_numpy()
     scaler = MinMaxScaler(feature_range=(-1, 1))
     amplitude = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
-    amplitude = amplitude[:1000]
+    # amplitude = amplitude[:1000]
     test_data = create_targets_sequences_with_window(amplitude, input_window, output_window)
     return test_data, scaler
 

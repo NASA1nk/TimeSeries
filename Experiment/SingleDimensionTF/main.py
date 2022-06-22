@@ -105,8 +105,7 @@ def plot_loss(eval_model, val_data, batch_size, scaler, input_window, output_win
     ax.plot(predict, c='red', label='predict')
     ax.plot(predict-ground_truth, color="green", label="diff")
     ax.legend() 
-    plt.savefig(f'./img/5/200_Epoch_{epoch}.png')
-    # plt.savefig(f'./img/50_1_512_1_32/Epoch_{epoch}_loss.png')
+    plt.savefig(f'./img/5/Epoch_{epoch}.png')
     # 返回验证集所有数据的平均MSEloss
     return total_loss / i
 
@@ -118,8 +117,8 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # path = './Experiment/data/2018AIOpsData/kpi_normal_1.csv'
     path = '../data/2018AIOpsData/kpi_normal_1.csv'
-    input_window = 100
-    output_window = 5
+    input_window = 5
+    output_window = 1
     # scaler用于恢复原始数据
     train_data, val_data, test_data, scaler = get_data(path, input_window, output_window)
     train_data, val_data = train_data.to(device), val_data.to(device)
@@ -132,7 +131,7 @@ if __name__ == "__main__":
     # 均方损失函数
     criterion = nn.MSELoss()
     # 学习率
-    lr = 0.001
+    lr = 0.005
     # 定义优化器，SGD随机梯度下降优化
     # optimizer = torch.optim.SGD(model.parameters(), lr=lr)
     # # 梯度下降优化算法：Adam自适应学习算法
