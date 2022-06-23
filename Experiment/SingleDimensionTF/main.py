@@ -117,12 +117,12 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # path = './Experiment/data/2018AIOpsData/kpi_normal_1.csv'
     path = '../data/2018AIOpsData/kpi_normal_1.csv'
-    input_window = 5
-    output_window = 1
+    input_window = 100
+    output_window = 10
     # scaler用于恢复原始数据
     train_data, val_data, test_data, scaler = get_data(path, input_window, output_window)
     train_data, val_data = train_data.to(device), val_data.to(device)
-    batch_size = 32
+    batch_size = 64
     # 初始化模型
     feature = 512
     layers = 1
@@ -131,7 +131,7 @@ if __name__ == "__main__":
     # 均方损失函数
     criterion = nn.MSELoss()
     # 学习率
-    lr = 0.005
+    lr = 0.01
     # 定义优化器，SGD随机梯度下降优化
     # optimizer = torch.optim.SGD(model.parameters(), lr=lr)
     # # 梯度下降优化算法：Adam自适应学习算法
