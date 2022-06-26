@@ -23,7 +23,6 @@ class TransformerModel(nn.Module):
 
     def init_weights(self):
         initrange = 0.1
-        self.transformer_encoder.weight.data.uniform_(-initrange,initrange)
         # decoder：nn.Linear，设置bias和weight（pytorch特性）
         self.decoder.bias.data.zero_()
         self.decoder.weight.data.uniform_(-initrange, initrange)

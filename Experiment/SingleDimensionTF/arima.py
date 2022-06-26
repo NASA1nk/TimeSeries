@@ -42,15 +42,14 @@ def test_stationarity(ts):
 # 移动平均法平滑处理
 def draw_moving(ts, size):
     rol_mean = ts.rolling(window=size).mean()
+    print(rol_mean)
     # 对size个数据进行加权移动平均
     rol_weighted_mean = pd.DataFrame.ewm(ts, span=size).mean()
-    print(rol_mean)
-    print(rol_weighted_mean)
     fig, ax = plt.subplots(1, 1, figsize=(10, 5))
     fig.patch.set_facecolor('white')
     ax.plot(ts, c='blue', label='Original')
     ax.plot(rol_mean, c='red', label='Rolling Mean')
-    ax.plot(rol_weighted_mean.to_numpy(), color="green", label="Weighted Rolling Mean")
+    ax.plot(rol_weighted_mean, color="green", label="Weighted Rolling Mean")
     ax.legend(loc='best') 
     plt.savefig(f'./img/arima/arima_draw_normal_moving.png')
 
@@ -91,7 +90,7 @@ def draw_acf_pacf(ts, lags):
 
 
 def arima(ts):
-    model = sm.tsa.ARIMA(ts, order=(1,1,1))
+    model = sm.tsa.ARIMA(ts, order=(2,2,2))
     result_arima = model.fit()
     predict_ts = result_arima.predict()
     # # 一阶差分还原
@@ -110,34 +109,19 @@ def arima(ts):
 
 
 if __name__ == "__main__":
+    # path = '.Experiment/data/2018AIOpsData/kpi_normal_1.csv'
     path = '../data/2018AIOpsData/kpi_normal_1.csv'
-    df = pd.read_csv(path, header=0, index_col=0, parse_dates=True, squeeze=True)
-    # series = df['value'].to_numpy()
-    # scaler = MinMaxScaler(feature_range=(0, 1))
-    # series = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
+    df = pd.read_csv(path, header=0, parse_dates=True, squeeze=True)
+    series = df['value'].to_numpy()
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    series = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
     series = df['value']
     sample = df.shape[0]//10*9
     train_data = series[sample:]
-
-    # df = pd.read_csv(path)
-    # train_data = df['value'][:1000]
     ts_log = np.log(train_data)
-    # draw_trend(train_data, 100)
-    # ret = test_stationarity(train_data)
 
-    # 按t值好像是平稳的？
-    # Test Statistic                -6.644628e+00
-    # 接近0了
-    # p-value                        5.303672e-09
-    # #Lags Used                     6.600000e+01
-    # Number of Observations Used    8.660000e+04
-    # 1% ： 严格拒绝原假设； 5%： 拒绝原假设
-    # Critical Value (1%)           -3.430426e+00
-    # Critical Value (5%)           -2.861573e+00
-    # Critical Value (10%)          -2.566788e+00
-    # dtype: float64
-    
-    # normal
+    # draw_trend(train_data, 100)
+
     # Test Statistic                    -2.496380
     # p-value                            0.116358
     # #Lags Used                        38.000000
@@ -145,34 +129,38 @@ if __name__ == "__main__":
     # Critical Value (1%)               -3.430880
     # Critical Value (5%)               -2.861774
     # Critical Value (10%)              -2.566895
-    # dtype: float64
+
+    # ret = test_stationarity(train_data)
+    # ret = test_stationarity(ts_log)
     # print(ret)
+    
+    # draw_moving(ts_log, 10)
 
-    # draw_moving(ts_log, 100)
-
-    # 差分操作
-    # 12阶差分
+    # # 差分操作
+    # # 先进行12阶差分
     # diff_12 = ts_log.diff(12)
     # diff_12.dropna(inplace=True)
-    # # 1阶差分
+    # # 再进行1阶差分
     # diff_12_1 = diff_12.diff(1)
     # diff_12_1.dropna(inplace=True)
-    # ret = test_stationarity(diff_12_1)
 
-    # Test Statistic                   -79.328859
+    # p = 0 满足
+    # Test Statistic                   -30.874377
     # p-value                            0.000000
-    # #Lags Used                        66.000000
-    # Number of Observations Used    86587.000000
-    # Critical Value (1%)               -3.430426
-    # Critical Value (5%)               -2.861573
-    # Critical Value (10%)              -2.566788
-    # dtype: float64
+    # #Lags Used                        40.000000
+    # Number of Observations Used    12330.000000
+    # Critical Value (1%)               -3.430880
+    # Critical Value (5%)               -2.861774
+    # Critical Value (10%)              -2.566895
+    # ret = test_stationarity(diff_12_1)
     # print(ret)
+    
 
-    # # 添加索引
+    # 添加索引
     # t = list(df['timestamp'])
     # t = [datetime.datetime.fromtimestamp(i).strftime("%Y-%m-%d %H:%M:%S") for i in t]
     # df.index = pd.to_datetime(t)
+    # td = df['value'][sample:]
     # trend, seasonal, residual = decompose(ts_log)
     # residual.dropna(inplace=True)
     # draw_trend(residual, 12)

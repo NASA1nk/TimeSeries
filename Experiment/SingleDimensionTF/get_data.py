@@ -40,6 +40,10 @@ def create_targets_sequences_with_window(source_data, input_window, output_windo
     return torch.FloatTensor(targets)
 
 
+def add_time_feature(path):
+    df = pd.read_csv(path, header=0, index_col=0, parse_dates=True, squeeze=True)
+    time = df['timestamp']
+
 def get_data(path, input_window, output_window):
     """
         导入CSV数据, 对数据做归一化处理, 初始化scaler在(-1,1)之间,然后使用scaler归一化数据, amplitude指序列振幅
@@ -82,7 +86,7 @@ def get_test_data(path, input_window, output_window):
     series = df['value'].to_numpy()
     scaler = MinMaxScaler(feature_range=(-1, 1))
     amplitude = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
-    # amplitude = amplitude[:1000]
+    amplitude = amplitude[:1000]
     test_data = create_targets_sequences_with_window(amplitude, input_window, output_window)
     return test_data, scaler
 
