@@ -90,7 +90,7 @@ def draw_acf_pacf(ts, lags):
 
 
 def arima(ts):
-    model = sm.tsa.ARIMA(ts, order=(1,1,1))
+    model = sm.tsa.ARIMA(ts, order=(2,2,2))
     result_arima = model.fit()
     predict_ts = result_arima.predict()
     # # 一阶差分还原
@@ -111,10 +111,10 @@ def arima(ts):
 if __name__ == "__main__":
     # path = '.Experiment/data/2018AIOpsData/kpi_normal_1.csv'
     path = '../data/2018AIOpsData/kpi_normal_1.csv'
-    df = pd.read_csv(path, header=0, index_col=0, parse_dates=True, squeeze=True)
-    # series = df['value'].to_numpy()
-    # scaler = MinMaxScaler(feature_range=(0, 1))
-    # series = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
+    df = pd.read_csv(path, header=0, parse_dates=True, squeeze=True)
+    series = df['value'].to_numpy()
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    series = scaler.fit_transform(series.reshape(-1, 1)).reshape(-1)
     series = df['value']
     sample = df.shape[0]//10*9
     train_data = series[sample:]
@@ -129,7 +129,9 @@ if __name__ == "__main__":
     # Critical Value (1%)               -3.430880
     # Critical Value (5%)               -2.861774
     # Critical Value (10%)              -2.566895
+
     # ret = test_stationarity(train_data)
+    # ret = test_stationarity(ts_log)
     # print(ret)
     
     # draw_moving(ts_log, 10)
@@ -155,14 +157,15 @@ if __name__ == "__main__":
     
 
     # 添加索引
-    t = list(df['timestamp'])
-    t = [datetime.datetime.fromtimestamp(i).strftime("%Y-%m-%d %H:%M:%S") for i in t]
-    df.index = pd.to_datetime(t)
-    trend, seasonal, residual = decompose(ts_log)
-    residual.dropna(inplace=True)
-    draw_trend(residual, 12)
-    ret = test_stationarity(residual)
-    print(ret)
+    # t = list(df['timestamp'])
+    # t = [datetime.datetime.fromtimestamp(i).strftime("%Y-%m-%d %H:%M:%S") for i in t]
+    # df.index = pd.to_datetime(t)
+    # td = df['value'][sample:]
+    # trend, seasonal, residual = decompose(ts_log)
+    # residual.dropna(inplace=True)
+    # draw_trend(residual, 12)
+    # ret = test_stationarity(residual)
+    # print(ret)
 
     # 对于长期趋势成分采用1阶差分来进行处理
     # rol_mean = ts_log.rolling(window=10).mean()
@@ -172,24 +175,24 @@ if __name__ == "__main__":
     # ts_diff_2.dropna(inplace=True)
     # draw_acf_pacf(ts_log, 30)
 
-    # ret = arima(ts_log)
-    # mse = sum((ret-train_data)**2)/train_data.size
-    # mae = sum(abs(ret-train_data))/train_data.size
-    # print(f'arima: {{MSE: {mse}, MAE: {mae}}}')
-    # fig, ax = plt.subplots(1, 1, figsize=(20, 5))
-    # fig.patch.set_facecolor('white')
-    # ax.plot(ret, c='blue', label='predict')
-    # ax.plot(train_data, color='red', label='Original')
-    # ax.set_title(f'MSE: {mse}, MAE: {mae}')
-    # ax.legend() 
-    # plt.savefig(f'./img/arima/arima_normal_predict.png')
+    ret = arima(ts_log)
+    mse = sum((ret-train_data)**2)/train_data.size
+    mae = sum(abs(ret-train_data))/train_data.size
+    print(f'arima: {{MSE: {mse}, MAE: {mae}}}')
+    fig, ax = plt.subplots(1, 1, figsize=(20, 5))
+    fig.patch.set_facecolor('white')
+    ax.plot(ret, c='blue', label='predict')
+    ax.plot(train_data, color='red', label='Original')
+    ax.set_title(f'MSE: {mse}, MAE: {mae}')
+    ax.legend() 
+    plt.savefig(f'./img/arima/arima_normal_predict.png')
     
-    # f = plt.figure(figsize=(10, 6))
-    # f.patch.set_facecolor('white')
-    # ax = f.add_subplot(2, 1, 1)
-    # ax.plot(ret, c='blue', label='predict')
-    # ax.legend()
-    # ax = f.add_subplot(2, 1, 2)
-    # ax.plot(train_data, color='red', label='Original')
-    # ax.legend()
-    # plt.savefig(f'./img/arima/arima_normal_predict_1.png')
+    f = plt.figure(figsize=(10, 6))
+    f.patch.set_facecolor('white')
+    ax = f.add_subplot(2, 1, 1)
+    ax.plot(ret, c='blue', label='predict')
+    ax.legend()
+    ax = f.add_subplot(2, 1, 2)
+    ax.plot(train_data, color='red', label='Original')
+    ax.legend()
+    plt.savefig(f'./img/arima/arima_normal_predict_1.png')

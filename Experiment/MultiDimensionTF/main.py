@@ -11,7 +11,7 @@ import torch.nn as nn
 from get_data import get_data, get_batch
 from models import TransformerModel
 from torch.utils.tensorboard import SummaryWriter
-
+import argparse
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -106,36 +106,41 @@ def plot(eval_model, val_data, batch_size, scaler, input_window, output_window):
 if __name__ == "__main__":
     start_time = time.time()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    input_window = 50
-    output_window = 1
-    batch_size = 32
-    data_path = './Experiment/data/MultiTSData.xlsx'
-    train_data, val_data, test_data, scaler = get_data(data_path, input_window, output_window)
+    # 获取命令行参数
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_csv_path", default='../data/MultiTSData.xlsx')
+    parser.add_argument("--input_window", type=int, default=100)
+    parser.add_argument("--output_window", type=int, default=1)
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--feature", type=int, default=10)
+    parser.add_argument("--layers", type=int, default=1)
+    parser.add_argument("--lr", type=float(), default=0.005)
+    parser.add_argument("--epochs", type=int, default=100)
+    args = parser.parse_args()
+    
+    train_data, val_data, test_data, scaler = get_data(args.data_csv_path, args.input_window, args.output_window)
     train_data, val_data = train_data.to(device), val_data.to(device)
-    feature = 10
-    layers = 1
-    name = f'{input_window}_{output_window}_{feature}_{layers}_{batch_size}'
-    model = TransformerModel(feature_size=feature, num_layers=layers).to(device)
+    name = f'{args.input_window}_{args.output_window}_{args.feature}_{args.layers}_{args.batch_size}'
+    model = TransformerModel(feature_size=args.feature, num_layers=args.layers).to(device)
     criterion = nn.MSELoss()
-    lr = 0.005
+    lr = args.lr
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
     writer = SummaryWriter(comment=f'{name}', flush_secs=10)
     best_val_loss = float("inf")
-    epochs = 100
     best_model = None
     calculate_loss_over_all_values = False
-    for epoch in range(1, epochs + 1):
+    for epoch in range(1, args.epochs + 1):
         epoch_start_time = time.time()
-        train(train_data, batch_size, input_window)
+        train(train_data, args.batch_size, args.input_window)
         if(epoch % 10 == 0):
-            val_loss = plot(model, val_data, batch_size, scaler, input_window, output_window)
+            val_loss = plot(model, val_data, args.batch_size, scaler, args.input_window, args.output_window)
         else:
-            val_loss = evaluate(model, val_data, batch_size, input_window, output_window)
+            val_loss = evaluate(model, val_data, args.batch_size, scaler, args.input_window, args.output_window)
             
         print('-' * 75)
         print('|   End of epoch {:2d}   |   avg_loss {:5.5f}   |   time: {:5.2f}s   |'.format(epoch,
-                                                                                              loss,
+                                                                                              val_loss,
                                                                                               (time.time() - epoch_start_time)))
         if val_loss < best_val_loss:
            best_val_loss = val_loss

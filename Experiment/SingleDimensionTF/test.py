@@ -77,14 +77,13 @@ def plot_diff(test_model, test_data, scaler, input_window, output_window):
         mse_sc += dif*dif
     mse_sc /= len(predict)
     mae_sc /= len(predict)
-    # fig, ax = plt.subplots(1, 1, figsize=(20, 5))
-    # fig.patch.set_facecolor('white')
-    # linewidth默认值1.5
-    # ax.plot(ground_truth, c='blue', linewidth=2, label='ground_truth')
-    # ax.plot(predict, c='red', marker='o', markerfacecolor='black', markevery=marker, label='predict')
+    fig, ax = plt.subplots(1, 1, figsize=(20, 5))
+    fig.patch.set_facecolor('white')
+    ax.plot(ground_truth, c='blue', label='ground_truth')
+    ax.plot(predict, c='red', marker='o', markerfacecolor='black', markevery=marker, label='predict')
     # ax.plot(diff_list, c="green", label="diff")
-    # ax.legend() 
-    # plt.savefig(f'./Experiment/SingleDimensionTF/img/{input_window}_{output_window}_512_{layers}_32_adam_predict.png')
+    ax.legend() 
+    plt.savefig(f'./Experiment/SingleDimensionTF/img/{input_window}_{output_window}_512_{layers}_32_adam_predict.png')
     # plt.savefig(f'./img/{input_window}_{output_window}_512_{layers}_32_adam_predict.png')
     return mse, mae, mse_sc, mae_sc
 
